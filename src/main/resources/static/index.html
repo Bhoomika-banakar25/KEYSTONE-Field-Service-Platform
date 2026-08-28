@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KEYSTONE — Field Service Platform</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- LOGIN PAGE -->
+<div id="loginPage" class="page active">
+    <div class="login-container">
+        <div class="login-box">
+            <div class="logo">
+                <h1>🔑 KEYSTONE</h1>
+                <p>Field Service Platform</p>
+            </div>
+            <div id="loginError" class="error-msg" style="display:none"></div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" id="loginEmail" placeholder="Enter your email">
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="loginPassword" placeholder="Enter your password">
+            </div>
+            <button class="btn btn-primary btn-full" onclick="login()">Login</button>
+            <p class="register-link">No account? <a href="#" onclick="showRegister()">Register here</a></p>
+        </div>
+    </div>
+</div>
+
+<!-- REGISTER PAGE -->
+<div id="registerPage" class="page">
+    <div class="login-container">
+        <div class="login-box">
+            <div class="logo">
+                <h1>🔑 KEYSTONE</h1>
+                <p>Create Account</p>
+            </div>
+            <div id="registerError" class="error-msg" style="display:none"></div>
+            <div id="registerSuccess" class="success-msg" style="display:none"></div>
+            <div class="form-group">
+                <label>Full Name</label>
+                <input type="text" id="regName" placeholder="Your full name">
+            </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" id="regEmail" placeholder="Your email">
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="regPassword" placeholder="Choose password">
+            </div>
+            <div class="form-group">
+                <label>Phone</label>
+                <input type="text" id="regPhone" placeholder="Phone number">
+            </div>
+            <div class="form-group">
+                <label>Role</label>
+                <select id="regRole">
+                    <option value="MANAGER">Manager</option>
+                    <option value="DISPATCHER">Dispatcher</option>
+                    <option value="TECHNICIAN">Technician</option>
+                    <option value="CUSTOMER">Customer</option>
+                    <option value="HR">HR</option>
+                </select>
+            </div>
+            <button class="btn btn-primary btn-full" onclick="register()">Register</button>
+            <p class="register-link">Have account? <a href="#" onclick="showLogin()">Login here</a></p>
+        </div>
+    </div>
+</div>
+
+<!-- DASHBOARD PAGE -->
+<div id="dashboardPage" class="page">
+
+    <!-- NAVBAR -->
+    <nav class="navbar">
+        <div class="nav-brand">🔑 KEYSTONE</div>
+        <div class="nav-menu">
+            <a href="#" class="nav-item active" onclick="showSection('dashboard',this)">Dashboard</a>
+            <a href="#" class="nav-item" id="navCustomers" onclick="showSection('customers',this)">Customers</a>
+            <a href="#" class="nav-item" onclick="showSection('workorders',this)">Work Orders</a>
+            <a href="#" class="nav-item" id="navParts" onclick="showSection('parts',this)">Parts</a>
+        </div>
+        <div class="nav-right">
+            <span id="userInfo" class="user-info"></span>
+            <button class="btn btn-outline" onclick="logout()">Logout</button>
+        </div>
+    </nav>
+
+    <!-- DASHBOARD SECTION -->
+    <div id="section-dashboard" class="section active">
+        <div class="section-header">
+            <h2>Dashboard</h2>
+        </div>
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card blue"><div class="stat-number" id="statTotal">-</div><div class="stat-label">Total Work Orders</div></div>
+            <div class="stat-card green"><div class="stat-number" id="statNew">-</div><div class="stat-label">New</div></div>
+            <div class="stat-card orange"><div class="stat-number" id="statInProgress">-</div><div class="stat-label">In Progress</div></div>
+            <div class="stat-card purple"><div class="stat-number" id="statCompleted">-</div><div class="stat-label">Completed</div></div>
+            <div class="stat-card teal"><div class="stat-number" id="statClosed">-</div><div class="stat-label">Closed</div></div>
+            <div class="stat-card red"><div class="stat-number" id="statBreached">-</div><div class="stat-label">SLA Breached</div></div>
+        </div>
+    </div>
+
+    <!-- CUSTOMERS SECTION -->
+    <div id="section-customers" class="section">
+        <div class="section-header">
+            <h2>Customers</h2>
+            <button class="btn btn-primary" id="addCustBtn" onclick="showModal('addCustomerModal')">+ Add Customer</button>
+        </div>
+        <div class="table-container">
+            <table class="data-table">
+                <thead><tr><th>ID</th><th>Company</th><th>Contact</th><th>Email</th><th>Phone</th><th>Status</th><th>Actions</th></tr></thead>
+                <tbody id="customersTable"><tr><td colspan="7" class="loading">Loading...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- WORK ORDERS SECTION -->
+    <div id="section-workorders" class="section">
+        <div class="section-header">
+            <h2>Work Orders</h2>
+            <button class="btn btn-primary" id="addWoBtn" onclick="showModal('addWorkOrderModal')">+ New Work Order</button>
+        </div>
+        <div class="table-container">
+            <table class="data-table">
+                <thead><tr><th>Code</th><th>Title</th><th>Priority</th><th>Status</th><th>Customer</th><th>SLA Due</th><th>Actions</th></tr></thead>
+                <tbody id="workOrdersTable"><tr><td colspan="7" class="loading">Loading...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- PARTS SECTION -->
+    <div id="section-parts" class="section">
+        <div class="section-header">
+            <h2>Parts Inventory</h2>
+            <button class="btn btn-primary" id="addPartBtn" onclick="showModal('addPartModal')">+ Add Part</button>
+        </div>
+        <div class="table-container">
+            <table class="data-table">
+                <thead><tr><th>ID</th><th>Name</th><th>SKU</th><th>Unit Cost</th><th>Stock</th><th>Actions</th></tr></thead>
+                <tbody id="partsTable"><tr><td colspan="6" class="loading">Loading...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<!-- MODAL: Add Customer -->
+<div id="addCustomerModal" class="modal">
+    <div class="modal-box">
+        <div class="modal-header"><h3>Add Customer</h3><span onclick="closeModal('addCustomerModal')" class="close-btn">✕</span></div>
+        <div class="form-group"><label>Company Name</label><input type="text" id="custCompany" placeholder="Company name"></div>
+        <div class="form-group"><label>Contact Person</label><input type="text" id="custContact" placeholder="Contact person"></div>
+        <div class="form-group"><label>Email</label><input type="email" id="custEmail" placeholder="Email"></div>
+        <div class="form-group"><label>Phone</label><input type="text" id="custPhone" placeholder="Phone"></div>
+        <div class="form-group"><label>Address</label><input type="text" id="custAddress" placeholder="Address"></div>
+        <div id="custError" class="error-msg" style="display:none"></div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeModal('addCustomerModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="addCustomer()">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: Add Work Order -->
+<div id="addWorkOrderModal" class="modal">
+    <div class="modal-box">
+        <div class="modal-header"><h3>New Work Order</h3><span onclick="closeModal('addWorkOrderModal')" class="close-btn">✕</span></div>
+        <div class="form-group"><label>Title</label><input type="text" id="woTitle" placeholder="Work order title"></div>
+        <div class="form-group"><label>Description</label><textarea id="woDesc" placeholder="Description" rows="3"></textarea></div>
+        <div class="form-group">
+            <label>Priority</label>
+            <select id="woPriority">
+                <option value="LOW">Low (72h SLA)</option>
+                <option value="MEDIUM">Medium (48h SLA)</option>
+                <option value="HIGH" selected>High (24h SLA)</option>
+                <option value="CRITICAL">Critical (4h SLA)</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Customer</label>
+            <select id="woCustomer" onchange="loadSitesForWO()"><option value="">Select customer...</option></select>
+        </div>
+        <div class="form-group">
+            <label>Site</label>
+            <select id="woSite"><option value="">Select site...</option></select>
+        </div>
+        <div id="woError" class="error-msg" style="display:none"></div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeModal('addWorkOrderModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="addWorkOrder()">Create</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: Add Part -->
+<div id="addPartModal" class="modal">
+    <div class="modal-box">
+        <div class="modal-header"><h3>Add Part</h3><span onclick="closeModal('addPartModal')" class="close-btn">✕</span></div>
+        <div class="form-group"><label>Part Name</label><input type="text" id="partName" placeholder="Part name"></div>
+        <div class="form-group"><label>SKU</label><input type="text" id="partSku" placeholder="SKU code"></div>
+        <div class="form-group"><label>Unit Cost (₹)</label><input type="number" id="partCost" placeholder="0.00"></div>
+        <div class="form-group"><label>Stock Quantity</label><input type="number" id="partStock" placeholder="0"></div>
+        <div id="partError" class="error-msg" style="display:none"></div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeModal('addPartModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="addPart()">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: Work Order Detail -->
+<div id="woDetailModal" class="modal">
+    <div class="modal-box modal-large">
+        <div class="modal-header"><h3 id="woDetailTitle">Work Order</h3><span onclick="closeModal('woDetailModal')" class="close-btn">✕</span></div>
+        <div id="woDetailContent"></div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeModal('woDetailModal')">Close</button>
+        </div>
+    </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

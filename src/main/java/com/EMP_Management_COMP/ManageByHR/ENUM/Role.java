@@ -1,0 +1,6 @@
+package com.EMP_Management_COMP.ManageByHR.ENUM;
+
+public enum Role {
+
+	ADMIN,HR,MANAGER,EMPLOYEE,CUSTOMER,TECHNICIAN,DISPATCHER
+}
