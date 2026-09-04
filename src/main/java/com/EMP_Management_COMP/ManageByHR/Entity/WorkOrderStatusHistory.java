@@ -35,13 +35,12 @@ public class WorkOrderStatusHistory {
     @Column(nullable = false)
     private WorkOrderStatus toStatus;
 
-    private String changedBy; // userEmail
+    private String changedBy;
 
     private LocalDateTime changedAt;
 
     private String note;
 
-    // Constructors
     public WorkOrderStatusHistory() {}
 
     public WorkOrderStatusHistory(WorkOrder workOrder, WorkOrderStatus fromStatus,
@@ -54,7 +53,6 @@ public class WorkOrderStatusHistory {
         this.note = note;
     }
 
-    // Getters and Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 

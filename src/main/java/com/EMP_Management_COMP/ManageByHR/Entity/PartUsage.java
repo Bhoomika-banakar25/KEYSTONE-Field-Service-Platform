@@ -33,12 +33,10 @@ public class PartUsage {
 
     private LocalDateTime usedAt;
 
-    private String usedBy; // technician email
+    private String usedBy;
 
-    // Constructors
     public PartUsage() {}
 
-    // Getters and Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 

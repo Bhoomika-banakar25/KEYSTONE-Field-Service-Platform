@@ -34,4 +34,5 @@ build/
 
 ### Sensitive files ###
 src/main/resources/application.properties
+!src/main/resources/application-prod.properties
 *.sql

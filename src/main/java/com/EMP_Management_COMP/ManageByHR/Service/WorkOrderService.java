@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.EMP_Management_COMP.ManageByHR.ENUM.Priority;
+import com.EMP_Management_COMP.ManageByHR.ENUM.Role;
 import com.EMP_Management_COMP.ManageByHR.ENUM.WorkOrderStatus;
 import com.EMP_Management_COMP.ManageByHR.Entity.Part;
 import com.EMP_Management_COMP.ManageByHR.Entity.PartUsage;
@@ -23,6 +24,7 @@ import com.EMP_Management_COMP.ManageByHR.Repository.TimeLogRepository;
 import com.EMP_Management_COMP.ManageByHR.Repository.UserAuthRepository;
 import com.EMP_Management_COMP.ManageByHR.Repository.WorkOrderRepository;
 import com.EMP_Management_COMP.ManageByHR.Repository.WorkOrderStatusHistoryRepository;
+import com.EMP_Management_COMP.ManageByHR.Security.EmailService;
 
 @Service
 public class WorkOrderService {
@@ -35,6 +37,7 @@ public class WorkOrderService {
     @Autowired private PartRepository partRepo;
     @Autowired private PartUsageRepository partUsageRepo;
     @Autowired private TimeLogRepository timeLogRepo;
+    @Autowired private EmailService emailService;
 
     @Transactional
     public WorkOrder createWorkOrder(Long customerId, Long siteId, String title,
@@ -122,6 +125,15 @@ public class WorkOrderService {
         wo.setUpdatedAt(LocalDateTime.now());
         workOrderRepo.save(wo);
         historyRepo.save(new WorkOrderStatusHistory(wo, prev, toStatus, changedBy, note));
+
+        if (toStatus == WorkOrderStatus.COMPLETED) {
+            List<UserAuth> managers = userAuthRepo.findByRole(Role.MANAGER);
+            for (UserAuth manager : managers) {
+                emailService.sendWorkOrderCompletedNotification(
+                        manager.getUserEmail(), wo.getCode(), wo.getTitle(), changedBy);
+            }
+        }
+
         return wo;
     }
 

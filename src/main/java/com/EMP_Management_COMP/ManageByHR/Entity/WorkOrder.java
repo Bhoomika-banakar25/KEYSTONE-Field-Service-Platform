@@ -25,7 +25,6 @@ public class WorkOrder {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Human-readable unique code e.g. WO-0001
     @Column(nullable = false, unique = true)
     private String code;
 
@@ -43,10 +42,8 @@ public class WorkOrder {
     @Column(nullable = false)
     private WorkOrderStatus status = WorkOrderStatus.NEW;
 
-    // SLA due date — calculated from priority on creation
     private LocalDateTime slaDueAt;
 
-    // SLA breach flag
     private boolean slaBreached = false;
 
     private LocalDateTime createdAt;
@@ -60,15 +57,12 @@ public class WorkOrder {
     @JoinColumn(name = "site_id", nullable = false)
     private Site site;
 
-    // Assigned technician (UserAuth)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "assigned_to")
     private UserAuth assignedTo;
 
-    // Constructors
     public WorkOrder() {}
 
-    // Getters and Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 

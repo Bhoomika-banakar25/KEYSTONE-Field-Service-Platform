@@ -3,39 +3,61 @@ let token = localStorage.getItem('token');
 let currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
 let userRole = localStorage.getItem('userRole') || '';
 
-// ── Init ──────────────────────────────────────────────────────────────────
 window.onload = () => {
     if (token && currentUser) {
         showDashboard();
     } else {
-        showPage('loginPage');
+        showPage('homePage');
     }
 };
 
-// ── Auth ──────────────────────────────────────────────────────────────────
+function goToLogin(role) {
+    showPage('loginPage');
+    const labels = { MANAGER: '👔 Manager Login', DISPATCHER: '📋 Dispatcher Login', TECHNICIAN: '🔧 Technician Login', CUSTOMER: '🏢 Customer Login' };
+    const colors = { MANAGER: '#1a0050', DISPATCHER: '#0a0060', TECHNICIAN: '#c1007a', CUSTOMER: '#006080' };
+    const descs  = {
+        MANAGER:    'Access dashboard, work orders, customers, reports & full control',
+        DISPATCHER: 'Create & assign work orders, manage customers and sites',
+        TECHNICIAN: 'View assigned jobs, start work, log parts & time',
+        CUSTOMER:   'Raise service requests and track your work orders'
+    };
+    document.getElementById('loginRoleTitle').textContent = labels[role] || 'Login';
+    document.getElementById('loginRoleBadge').textContent = role;
+    document.getElementById('loginRoleBadge').style.background = colors[role] || '#333';
+    document.getElementById('loginRoleBadge').style.color = 'white';
+    document.getElementById('loginRoleDesc').textContent = descs[role] || '';
+    document.getElementById('expectedRole').value = role;
+    document.getElementById('loginError').style.display = 'none';
+    document.getElementById('registerHint').style.display = role === 'CUSTOMER' ? 'block' : 'none';
+    document.getElementById('loginEmail').focus();
+}
+
 async function login() {
     const email = document.getElementById('loginEmail').value.trim();
     const pass  = document.getElementById('loginPassword').value;
+    const expectedRole = document.getElementById('expectedRole').value;
     if (!email || !pass) { showError('loginError', 'Please fill all fields'); return; }
-
     try {
         const res = await fetch(`${API}/api/user_auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ userEmail: email, password: pass })
         });
         if (!res.ok) { showError('loginError', 'Invalid email or password'); return; }
         const t = await res.text();
+        const payload = JSON.parse(atob(t.split('.')[1]));
+        const actualRole = payload.Role || '';
+
+        if (expectedRole && actualRole !== expectedRole) {
+            showError('loginError', `Access denied. This is ${expectedRole} Login. Your account is ${actualRole}.`);
+            return;
+        }
+
         token = t;
         localStorage.setItem('token', token);
-
-        // Decode JWT to get role
-        const payload = JSON.parse(atob(t.split('.')[1]));
-        userRole = payload.Role || '';
+        userRole = actualRole;
         localStorage.setItem('userRole', userRole);
         currentUser = { email };
         localStorage.setItem('currentUser', JSON.stringify(currentUser));
-
         showDashboard();
     } catch(e) { showError('loginError', 'Cannot connect to server'); }
 }
@@ -48,19 +70,16 @@ async function register() {
         phone:     document.getElementById('regPhone').value,
         role:      document.getElementById('regRole').value
     };
-    if (!body.userName || !body.userEmail || !body.password) {
-        showError('registerError', 'Please fill all required fields'); return;
-    }
+    if (!body.userName || !body.userEmail || !body.password) { showError('registerError', 'Please fill all required fields'); return; }
     try {
         const res = await fetch(`${API}/api/user_auth/register`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
         });
         const data = await res.json();
         if (!res.ok) { showError('registerError', data.message || 'Registration failed'); return; }
         document.getElementById('registerError').style.display = 'none';
         showSuccess('registerSuccess', 'Registered successfully! Please login.');
-        setTimeout(showLogin, 1500);
+        setTimeout(() => showPage('homePage'), 1500);
     } catch(e) { showError('registerError', 'Cannot connect to server'); }
 }
 
@@ -68,46 +87,43 @@ function logout() {
     fetch(`${API}/api/user_auth/logout`, { method: 'POST', headers: authHeader() });
     token = null; currentUser = null; userRole = '';
     localStorage.clear();
-    showPage('loginPage');
+    showPage('homePage');
 }
 
-// ── Navigation ────────────────────────────────────────────────────────────
 function showPage(id) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.getElementById(id).classList.add('active');
 }
-function showLogin()    { showPage('loginPage'); }
+function showLogin() { showPage('loginPage'); }
 function showRegister() { showPage('registerPage'); }
 
 function showDashboard() {
     showPage('dashboardPage');
     document.getElementById('userInfo').textContent = `${currentUser?.email} (${userRole})`;
     applyRoleVisibility();
-    showSection('dashboard');
+    if (userRole === 'CUSTOMER') {
+        showSection('portal', document.getElementById('navPortal'));
+    } else {
+        showSection('dashboard', null);
+    }
 }
 
-// Hide/show nav items based on role
 function applyRoleVisibility() {
-    const isManager    = ['MANAGER','ADMIN'].includes(userRole);
-    const isDispatcher = ['DISPATCHER'].includes(userRole);
-    const isTechnician = ['TECHNICIAN','EMPLOYEE'].includes(userRole);
-    const isCustomer   = ['CUSTOMER'].includes(userRole);
+    const isManager    = ['MANAGER', 'ADMIN'].includes(userRole);
+    const isDispatcher = userRole === 'DISPATCHER';
+    const isCustomer   = userRole === 'CUSTOMER';
 
-    // Nav items
-    const nav = {
-        customers:  isManager || isDispatcher,
-        parts:      isManager || isDispatcher,
-        workorders: true // everyone sees work orders
-    };
-    document.getElementById('navCustomers').style.display  = nav.customers  ? '' : 'none';
-    document.getElementById('navParts').style.display      = nav.parts      ? '' : 'none';
+    document.getElementById('navCustomers').style.display  = (isManager || isDispatcher) ? '' : 'none';
+    document.getElementById('navParts').style.display      = (isManager || isDispatcher) ? '' : 'none';
+    document.getElementById('navPortal').style.display     = isCustomer ? '' : 'none';
+    document.getElementById('navWorkOrders').style.display = isCustomer ? 'none' : '';
+    document.getElementById('navUsers').style.display      = isManager ? '' : 'none';
 
-    // Add buttons
-    const addWoBtn = document.getElementById('addWoBtn');
-    if (addWoBtn) addWoBtn.style.display = (isManager || isDispatcher) ? '' : 'none';
+    const addWoBtn   = document.getElementById('addWoBtn');
     const addCustBtn = document.getElementById('addCustBtn');
-    if (addCustBtn) addCustBtn.style.display = (isManager || isDispatcher) ? '' : 'none';
     const addPartBtn = document.getElementById('addPartBtn');
+    if (addWoBtn)   addWoBtn.style.display   = (isManager || isDispatcher) ? '' : 'none';
+    if (addCustBtn) addCustBtn.style.display = (isManager || isDispatcher) ? '' : 'none';
     if (addPartBtn) addPartBtn.style.display = isManager ? '' : 'none';
 }
 
@@ -121,9 +137,10 @@ function showSection(name, el) {
     if (name === 'customers')  loadCustomers();
     if (name === 'workorders') loadWorkOrders();
     if (name === 'parts')      loadParts();
+    if (name === 'portal')     loadPortal();
+    if (name === 'users')      loadUsers();
 }
 
-// ── API Helper ────────────────────────────────────────────────────────────
 function authHeader() {
     return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token };
 }
@@ -135,7 +152,6 @@ async function apiFetch(url, options = {}) {
     return res;
 }
 
-// ── Dashboard ─────────────────────────────────────────────────────────────
 async function loadDashboard() {
     try {
         const res = await apiFetch('/api/reports/summary');
@@ -147,10 +163,9 @@ async function loadDashboard() {
         document.getElementById('statCompleted').textContent  = data.completed   || 0;
         document.getElementById('statClosed').textContent     = data.closed      || 0;
         document.getElementById('statBreached').textContent   = data.slaBreached || 0;
-    } catch(e) { /* no dashboard permission */ }
+    } catch(e) {}
 }
 
-// ── Customers ─────────────────────────────────────────────────────────────
 async function loadCustomers() {
     const tbody = document.getElementById('customersTable');
     tbody.innerHTML = '<tr><td colspan="7" class="loading">Loading...</td></tr>';
@@ -182,11 +197,8 @@ async function addCustomer() {
     };
     if (!body.companyName || !body.email) { showError('custError', 'Company name and email are required'); return; }
     const res = await apiFetch('/api/customers', { method: 'POST', body: JSON.stringify(body) });
-    if (res?.ok) {
-        closeModal('addCustomerModal');
-        clearFields(['custCompany','custContact','custEmail','custPhone','custAddress']);
-        loadCustomers();
-    } else { showError('custError', 'Failed to create customer'); }
+    if (res?.ok) { closeModal('addCustomerModal'); clearFields(['custCompany','custContact','custEmail','custPhone','custAddress']); loadCustomers(); showToast('Customer added!'); }
+    else { showError('custError', 'Failed to create customer'); }
 }
 
 async function viewSites(customerId, companyName) {
@@ -206,10 +218,10 @@ async function viewSites(customerId, companyName) {
             <div style="margin-top:20px;padding-top:16px;border-top:1px solid #eee">
                 <h4 style="margin-bottom:12px;color:#1e3a5f">Add New Site</h4>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-                    <input id="sName"  placeholder="Site name *"    style="padding:9px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px">
-                    <input id="sCity"  placeholder="City"           style="padding:9px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px">
-                    <input id="sAddr"  placeholder="Address *"      style="padding:9px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px">
-                    <input id="sPhone" placeholder="Contact phone"  style="padding:9px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px">
+                    <input id="sName"  placeholder="Site name *"   style="padding:9px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px">
+                    <input id="sCity"  placeholder="City"          style="padding:9px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px">
+                    <input id="sAddr"  placeholder="Address *"     style="padding:9px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px">
+                    <input id="sPhone" placeholder="Contact phone" style="padding:9px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px">
                 </div>
                 <button class="btn btn-primary btn-sm" style="margin-top:12px" onclick="addSite(${customerId})">Add Site</button>
             </div>` : ''}
@@ -221,11 +233,10 @@ async function addSite(customerId) {
     const body = { name: document.getElementById('sName').value, city: document.getElementById('sCity').value, address: document.getElementById('sAddr').value, contactPhone: document.getElementById('sPhone').value };
     if (!body.name || !body.address) { alert('Site name and address required'); return; }
     const res = await apiFetch(`/api/customers/${customerId}/sites`, { method: 'POST', body: JSON.stringify(body) });
-    if (res?.ok) { closeModal('woDetailModal'); showToast('Site added successfully!'); }
+    if (res?.ok) { closeModal('woDetailModal'); showToast('Site added!'); }
     else { alert('Failed to add site'); }
 }
 
-// ── Work Orders ───────────────────────────────────────────────────────────
 async function loadWorkOrders() {
     const tbody = document.getElementById('workOrdersTable');
     tbody.innerHTML = '<tr><td colspan="7" class="loading">Loading...</td></tr>';
@@ -239,8 +250,7 @@ async function loadWorkOrders() {
                 <td><strong>${w.code}</strong></td>
                 <td>${w.title}</td>
                 <td><span class="badge badge-${w.priority?.toLowerCase()}">${w.priority}</span></td>
-                <td><span class="badge badge-${statusClass(w.status)}">${formatStatus(w.status)}</span>
-                    ${w.slaBreached ? '<span style="color:#c62828;font-size:11px;margin-left:4px">⚠ SLA</span>' : ''}</td>
+                <td><span class="badge badge-${statusClass(w.status)}">${formatStatus(w.status)}</span>${w.slaBreached ? ' <span style="color:#c62828;font-size:11px">⚠ SLA</span>' : ''}</td>
                 <td>${w.customer?.companyName || '-'}</td>
                 <td style="font-size:12px;color:${isSlaWarning(w.slaDueAt)?'#e65100':'#555'}">${w.slaDueAt ? formatDate(w.slaDueAt) : '-'}</td>
                 <td><button class="btn btn-sm btn-primary" onclick="viewWorkOrder(${w.id})">View</button></td>
@@ -253,8 +263,7 @@ async function loadCustomersForWO() {
     if (!res) return;
     const customers = await res.json();
     const sel = document.getElementById('woCustomer');
-    sel.innerHTML = '<option value="">Select customer...</option>' +
-        customers.map(c => `<option value="${c.id}">${c.companyName}</option>`).join('');
+    sel.innerHTML = '<option value="">Select customer...</option>' + customers.map(c => `<option value="${c.id}">${c.companyName}</option>`).join('');
 }
 
 async function loadSitesForWO() {
@@ -264,39 +273,24 @@ async function loadSitesForWO() {
     if (!res) return;
     const sites = await res.json();
     const sel = document.getElementById('woSite');
-    sel.innerHTML = sites.length
-        ? '<option value="">Select site...</option>' + sites.map(s => `<option value="${s.id}">${s.name}</option>`).join('')
-        : '<option value="">No sites — add one first</option>';
+    sel.innerHTML = sites.length ? '<option value="">Select site...</option>' + sites.map(s => `<option value="${s.id}">${s.name}</option>`).join('') : '<option value="">No sites found</option>';
 }
 
 async function addWorkOrder() {
-    const body = {
-        title:       document.getElementById('woTitle').value,
-        description: document.getElementById('woDesc').value,
-        priority:    document.getElementById('woPriority').value,
-        customerId:  document.getElementById('woCustomer').value,
-        siteId:      document.getElementById('woSite').value
-    };
+    const body = { title: document.getElementById('woTitle').value, description: document.getElementById('woDesc').value, priority: document.getElementById('woPriority').value, customerId: document.getElementById('woCustomer').value, siteId: document.getElementById('woSite').value };
     if (!body.title || !body.customerId || !body.siteId) { showError('woError', 'Title, customer and site are required'); return; }
     const res = await apiFetch('/api/work-orders', { method: 'POST', body: JSON.stringify(body) });
-    if (res?.ok) {
-        closeModal('addWorkOrderModal');
-        clearFields(['woTitle','woDesc']);
-        loadWorkOrders();
-        showToast('Work order created!');
-    } else { showError('woError', 'Failed to create work order'); }
+    if (res?.ok) { closeModal('addWorkOrderModal'); clearFields(['woTitle','woDesc']); loadWorkOrders(); showToast('Work order created!'); }
+    else { showError('woError', 'Failed to create work order'); }
 }
 
 async function viewWorkOrder(id) {
-    const [woRes, histRes] = await Promise.all([
-        apiFetch(`/api/work-orders/${id}`),
-        apiFetch(`/api/work-orders/${id}/history`)
-    ]);
+    const [woRes, histRes] = await Promise.all([apiFetch(`/api/work-orders/${id}`), apiFetch(`/api/work-orders/${id}/history`)]);
     if (!woRes) return;
-    const wo      = await woRes.json();
+    const wo = await woRes.json();
     const history = histRes ? await histRes.json() : [];
     const transitions = getAvailableTransitions(wo.status);
-    const canAssign = ['MANAGER','ADMIN','DISPATCHER'].includes(userRole);
+    const canAssign  = ['MANAGER','ADMIN','DISPATCHER'].includes(userRole);
     const canLogWork = ['TECHNICIAN','EMPLOYEE','MANAGER','ADMIN'].includes(userRole);
 
     document.getElementById('woDetailTitle').textContent = wo.code + ' — ' + wo.title;
@@ -312,71 +306,37 @@ async function viewWorkOrder(id) {
             <div class="detail-item"><label>Created</label><span>${wo.createdAt ? formatDate(wo.createdAt) : '-'}</span></div>
             <div class="detail-item" style="grid-column:1/-1"><label>Description</label><span>${wo.description || '—'}</span></div>
         </div>
-
-        ${transitions.length ? `
-        <div class="transition-buttons">
-            <strong style="font-size:13px;color:#555;margin-right:8px">Change Status:</strong>
-            ${transitions.map(t => `<button class="btn btn-sm ${t.cls}" onclick="transition(${id},'${t.status}')">${t.label}</button>`).join('')}
-        </div>` : '<div style="padding:0 24px 12px;color:#888;font-size:13px">No transitions available for this status.</div>'}
-
+        ${transitions.length ? `<div class="transition-buttons"><strong style="font-size:13px;color:#555;margin-right:8px">Change Status:</strong>${transitions.map(t => `<button class="btn btn-sm ${t.cls}" onclick="transition(${id},'${t.status}')">${t.label}</button>`).join('')}</div>` : ''}
         ${canAssign && wo.status !== 'CLOSED' && wo.status !== 'CANCELLED' ? `
         <div style="padding:0 24px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
             <strong style="font-size:13px;color:#555">Assign to Technician:</strong>
-            <select id="assignTechSelect" style="padding:7px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px">
-                <option value="">Loading technicians...</option>
-            </select>
+            <select id="assignTechSelect" style="padding:7px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px"><option value="">Loading...</option></select>
             <button class="btn btn-sm btn-warning" onclick="assignTechnician(${id})">Assign</button>
         </div>` : ''}
-
         ${canLogWork && wo.status === 'IN_PROGRESS' ? `
         <div style="padding:0 24px 16px;border-top:1px solid #f0f0f0;padding-top:14px">
             <strong style="font-size:13px;color:#555;display:block;margin-bottom:10px">Log Work:</strong>
-            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-                <div>
-                    <label style="font-size:12px;color:#888;display:block">Parts Used</label>
-                    <select id="partSelect" style="padding:7px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;min-width:150px">
-                        <option value="">Select part...</option>
-                    </select>
-                </div>
-                <div>
-                    <label style="font-size:12px;color:#888;display:block">Qty</label>
-                    <input id="partQty" type="number" value="1" min="1" style="padding:7px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;width:70px">
-                </div>
-                <button class="btn btn-sm btn-success" style="margin-top:16px" onclick="logParts(${id})">Log Parts</button>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+                <div><label style="font-size:12px;color:#888;display:block">Part</label><select id="partSelect" style="padding:7px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;min-width:150px"><option value="">Select part...</option></select></div>
+                <div><label style="font-size:12px;color:#888;display:block">Qty</label><input id="partQty" type="number" value="1" min="1" style="padding:7px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;width:70px"></div>
+                <button class="btn btn-sm btn-success" onclick="logParts(${id})">Log Parts</button>
             </div>
-            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px">
-                <div>
-                    <label style="font-size:12px;color:#888;display:block">Time (minutes)</label>
-                    <input id="timeMinutes" type="number" min="1" placeholder="e.g. 60" style="padding:7px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;width:120px">
-                </div>
-                <div>
-                    <label style="font-size:12px;color:#888;display:block">Note</label>
-                    <input id="timeNote" type="text" placeholder="Optional note" style="padding:7px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;width:200px">
-                </div>
-                <button class="btn btn-sm btn-success" style="margin-top:16px" onclick="logTime(${id})">Log Time</button>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:10px">
+                <div><label style="font-size:12px;color:#888;display:block">Minutes</label><input id="timeMinutes" type="number" min="1" placeholder="e.g. 60" style="padding:7px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;width:100px"></div>
+                <div><label style="font-size:12px;color:#888;display:block">Note</label><input id="timeNote" type="text" placeholder="Optional" style="padding:7px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;width:180px"></div>
+                <button class="btn btn-sm btn-success" onclick="logTime(${id})">Log Time</button>
             </div>
         </div>` : ''}
-
         <div class="history-table">
             <h4>Status History</h4>
             ${history.length ? `
             <table class="data-table">
                 <thead><tr><th>From</th><th>To</th><th>By</th><th>When</th><th>Note</th></tr></thead>
-                <tbody>${history.map(h => `
-                    <tr>
-                        <td>${h.fromStatus ? formatStatus(h.fromStatus) : '—'}</td>
-                        <td><span class="badge badge-${statusClass(h.toStatus)}">${formatStatus(h.toStatus)}</span></td>
-                        <td style="font-size:12px">${h.changedBy || '-'}</td>
-                        <td style="font-size:12px">${formatDate(h.changedAt)}</td>
-                        <td style="font-size:12px">${h.note || '-'}</td>
-                    </tr>`).join('')}
-                </tbody>
+                <tbody>${history.map(h => `<tr><td>${h.fromStatus ? formatStatus(h.fromStatus) : '—'}</td><td><span class="badge badge-${statusClass(h.toStatus)}">${formatStatus(h.toStatus)}</span></td><td style="font-size:12px">${h.changedBy||'-'}</td><td style="font-size:12px">${formatDate(h.changedAt)}</td><td style="font-size:12px">${h.note||'-'}</td></tr>`).join('')}</tbody>
             </table>` : '<p style="color:#888;font-size:13px">No history yet</p>'}
         </div>`;
 
     showModal('woDetailModal');
-
-    // Load technicians and parts in background
     if (canAssign && wo.status !== 'CLOSED' && wo.status !== 'CANCELLED') loadTechnicians();
     if (canLogWork && wo.status === 'IN_PROGRESS') loadPartsDropdown();
 }
@@ -384,13 +344,10 @@ async function viewWorkOrder(id) {
 async function loadTechnicians() {
     const sel = document.getElementById('assignTechSelect');
     if (!sel) return;
-    try {
-        const res = await apiFetch('/api/users/technicians');
-        if (!res || !res.ok) { sel.innerHTML = '<option value="">No technicians found</option>'; return; }
-        const techs = await res.json();
-        sel.innerHTML = '<option value="">Select technician...</option>' +
-            techs.map(t => `<option value="${t.id}">${t.userName} (${t.userEmail})</option>`).join('');
-    } catch(e) { sel.innerHTML = '<option value="">Error loading</option>'; }
+    const res = await apiFetch('/api/users/technicians');
+    if (!res || !res.ok) { sel.innerHTML = '<option value="">No technicians</option>'; return; }
+    const techs = await res.json();
+    sel.innerHTML = '<option value="">Select technician...</option>' + techs.map(t => `<option value="${t.id}">${t.userName} (${t.userEmail})</option>`).join('');
 }
 
 async function loadPartsDropdown() {
@@ -399,48 +356,29 @@ async function loadPartsDropdown() {
     const res = await apiFetch('/api/parts');
     if (!res || !res.ok) return;
     const parts = await res.json();
-    sel.innerHTML = '<option value="">Select part...</option>' +
-        parts.map(p => `<option value="${p.id}">${p.name} (Stock: ${p.stockQty})</option>`).join('');
+    sel.innerHTML = '<option value="">Select part...</option>' + parts.map(p => `<option value="${p.id}">${p.name} (Stock: ${p.stockQty})</option>`).join('');
 }
 
 async function assignTechnician(workOrderId) {
     const techId = document.getElementById('assignTechSelect').value;
     if (!techId) { alert('Please select a technician'); return; }
-    const res = await apiFetch(`/api/work-orders/${workOrderId}/assign`, {
-        method: 'POST',
-        body: JSON.stringify({ technicianId: techId })
-    });
-    if (res?.ok) {
-        closeModal('woDetailModal');
-        loadWorkOrders();
-        showToast('Technician assigned successfully!');
-    } else { alert('Failed to assign technician'); }
+    const res = await apiFetch(`/api/work-orders/${workOrderId}/assign`, { method: 'POST', body: JSON.stringify({ technicianId: techId }) });
+    if (res?.ok) { closeModal('woDetailModal'); loadWorkOrders(); showToast('Technician assigned!'); }
+    else { alert('Failed to assign'); }
 }
 
 async function transition(id, status) {
-    const note = prompt(`Add a note for: ${formatStatus(status)} (optional):`) || '';
-    const res = await apiFetch(`/api/work-orders/${id}/status`, {
-        method: 'POST',
-        body: JSON.stringify({ status, note })
-    });
-    if (res?.ok) {
-        closeModal('woDetailModal');
-        loadWorkOrders();
-        showToast('Status updated to ' + formatStatus(status));
-    } else {
-        const err = await res?.text();
-        alert('Not allowed: ' + (err || 'Invalid transition'));
-    }
+    const note = prompt(`Note for: ${formatStatus(status)} (optional):`) || '';
+    const res = await apiFetch(`/api/work-orders/${id}/status`, { method: 'POST', body: JSON.stringify({ status, note }) });
+    if (res?.ok) { closeModal('woDetailModal'); loadWorkOrders(); showToast('Status updated to ' + formatStatus(status)); }
+    else { const e = await res?.text(); alert('Not allowed: ' + (e || 'Invalid transition')); }
 }
 
 async function logParts(workOrderId) {
     const partId = document.getElementById('partSelect').value;
     const qty    = parseInt(document.getElementById('partQty').value) || 1;
     if (!partId) { alert('Please select a part'); return; }
-    const res = await apiFetch(`/api/work-orders/${workOrderId}/parts`, {
-        method: 'POST',
-        body: JSON.stringify({ partId, qty })
-    });
+    const res = await apiFetch(`/api/work-orders/${workOrderId}/parts`, { method: 'POST', body: JSON.stringify({ partId, qty }) });
     if (res?.ok) { showToast('Parts logged!'); loadPartsDropdown(); }
     else { const e = await res?.text(); alert('Failed: ' + e); }
 }
@@ -449,46 +387,26 @@ async function logTime(workOrderId) {
     const minutes = parseInt(document.getElementById('timeMinutes').value);
     const note    = document.getElementById('timeNote').value;
     if (!minutes || minutes < 1) { alert('Please enter valid minutes'); return; }
-    const res = await apiFetch(`/api/work-orders/${workOrderId}/time`, {
-        method: 'POST',
-        body: JSON.stringify({ minutes, note })
-    });
-    if (res?.ok) { showToast(`${minutes} minutes logged!`); document.getElementById('timeMinutes').value = ''; document.getElementById('timeNote').value = ''; }
+    const res = await apiFetch(`/api/work-orders/${workOrderId}/time`, { method: 'POST', body: JSON.stringify({ minutes, note }) });
+    if (res?.ok) { showToast(`${minutes} minutes logged!`); document.getElementById('timeMinutes').value = ''; }
     else { alert('Failed to log time'); }
 }
 
 function getAvailableTransitions(status) {
     const isMgr  = ['MANAGER','ADMIN'].includes(userRole);
-    const isDis  = ['DISPATCHER'].includes(userRole);
+    const isDis  = userRole === 'DISPATCHER';
     const isTech = ['TECHNICIAN','EMPLOYEE'].includes(userRole);
     const map = {
-        'NEW':         [
-            ...(isMgr||isDis ? [{ status:'ASSIGNED',    label:'Assign',       cls:'btn-warning' }] : []),
-            ...(isMgr        ? [{ status:'CANCELLED',   label:'Cancel',       cls:'btn-danger'  }] : [])
-        ],
-        'ASSIGNED':    [
-            ...(isTech||isMgr ? [{ status:'IN_PROGRESS', label:'▶ Start Work', cls:'btn-success' }] : []),
-            ...(isMgr||isDis  ? [{ status:'CANCELLED',   label:'Cancel',       cls:'btn-danger'  }] : [])
-        ],
-        'IN_PROGRESS': [
-            ...(isTech||isMgr ? [{ status:'ON_HOLD',   label:'⏸ Hold',      cls:'btn-warning' }] : []),
-            ...(isTech||isMgr ? [{ status:'COMPLETED', label:'✓ Complete',  cls:'btn-success' }] : [])
-        ],
-        'ON_HOLD':     [
-            ...(isTech||isMgr ? [{ status:'IN_PROGRESS', label:'▶ Resume',  cls:'btn-success' }] : []),
-            ...(isMgr         ? [{ status:'CANCELLED',   label:'Cancel',    cls:'btn-danger'  }] : [])
-        ],
-        'COMPLETED':   [
-            ...(isMgr ? [{ status:'CLOSED',      label:'✓ Close',   cls:'btn-primary' }] : []),
-            ...(isMgr ? [{ status:'IN_PROGRESS', label:'↩ Reopen',  cls:'btn-warning' }] : [])
-        ],
-        'CLOSED':      [],
-        'CANCELLED':   []
+        'NEW':         [...(isMgr||isDis ? [{ status:'ASSIGNED', label:'Assign', cls:'btn-warning' }] : []), ...(isMgr ? [{ status:'CANCELLED', label:'Cancel', cls:'btn-danger' }] : [])],
+        'ASSIGNED':    [...(isTech||isMgr ? [{ status:'IN_PROGRESS', label:'▶ Start Work', cls:'btn-success' }] : []), ...(isMgr||isDis ? [{ status:'CANCELLED', label:'Cancel', cls:'btn-danger' }] : [])],
+        'IN_PROGRESS': [...(isTech||isMgr ? [{ status:'ON_HOLD', label:'⏸ Hold', cls:'btn-warning' }] : []), ...(isTech||isMgr ? [{ status:'COMPLETED', label:'✓ Complete', cls:'btn-success' }] : [])],
+        'ON_HOLD':     [...(isTech||isMgr ? [{ status:'IN_PROGRESS', label:'▶ Resume', cls:'btn-success' }] : []), ...(isMgr ? [{ status:'CANCELLED', label:'Cancel', cls:'btn-danger' }] : [])],
+        'COMPLETED':   [...(isMgr ? [{ status:'CLOSED', label:'✓ Close', cls:'btn-primary' }] : []), ...(isMgr ? [{ status:'IN_PROGRESS', label:'↩ Reopen', cls:'btn-warning' }] : [])],
+        'CLOSED': [], 'CANCELLED': []
     };
     return map[status] || [];
 }
 
-// ── Parts ─────────────────────────────────────────────────────────────────
 async function loadParts() {
     const tbody = document.getElementById('partsTable');
     tbody.innerHTML = '<tr><td colspan="6" class="loading">Loading...</td></tr>';
@@ -500,31 +418,20 @@ async function loadParts() {
         const canDelete = ['MANAGER','ADMIN'].includes(userRole);
         tbody.innerHTML = data.map(p => `
             <tr>
-                <td>${p.id}</td>
-                <td><strong>${p.name}</strong></td>
-                <td><code>${p.sku}</code></td>
-                <td>₹${p.unitCost?.toFixed(2) || '0.00'}</td>
-                <td><span style="color:${p.stockQty < 5 ? '#c62828' : '#388e3c'};font-weight:600">${p.stockQty} ${p.stockQty < 5 ? '⚠' : ''}</span></td>
+                <td>${p.id}</td><td><strong>${p.name}</strong></td><td><code>${p.sku}</code></td>
+                <td>₹${p.unitCost?.toFixed(2)||'0.00'}</td>
+                <td><span style="color:${p.stockQty<5?'#c62828':'#388e3c'};font-weight:600">${p.stockQty}${p.stockQty<5?' ⚠':''}</span></td>
                 <td>${canDelete ? `<button class="btn btn-sm btn-danger" onclick="deletePart(${p.id})">Delete</button>` : '—'}</td>
             </tr>`).join('');
     } catch(e) { tbody.innerHTML = '<tr><td colspan="6" class="loading">Error</td></tr>'; }
 }
 
 async function addPart() {
-    const body = {
-        name:     document.getElementById('partName').value,
-        sku:      document.getElementById('partSku').value,
-        unitCost: parseFloat(document.getElementById('partCost').value) || 0,
-        stockQty: parseInt(document.getElementById('partStock').value) || 0
-    };
+    const body = { name: document.getElementById('partName').value, sku: document.getElementById('partSku').value, unitCost: parseFloat(document.getElementById('partCost').value)||0, stockQty: parseInt(document.getElementById('partStock').value)||0 };
     if (!body.name || !body.sku) { showError('partError', 'Name and SKU are required'); return; }
     const res = await apiFetch('/api/parts', { method: 'POST', body: JSON.stringify(body) });
-    if (res?.ok) {
-        closeModal('addPartModal');
-        clearFields(['partName','partSku','partCost','partStock']);
-        loadParts();
-        showToast('Part added!');
-    } else { showError('partError', 'Failed to add part'); }
+    if (res?.ok) { closeModal('addPartModal'); clearFields(['partName','partSku','partCost','partStock']); loadParts(); showToast('Part added!'); }
+    else { showError('partError', 'Failed to add part'); }
 }
 
 async function deletePart(id) {
@@ -534,14 +441,121 @@ async function deletePart(id) {
     else { alert('Failed to delete'); }
 }
 
-// ── Modal ─────────────────────────────────────────────────────────────────
+async function loadPortal() {
+    const tbody = document.getElementById('portalTable');
+    tbody.innerHTML = '<tr><td colspan="7" class="loading">Loading your requests...</td></tr>';
+    try {
+        const res = await apiFetch('/api/portal/my-orders');
+        if (!res || !res.ok) {
+            tbody.innerHTML = '<tr><td colspan="7" class="loading">Unable to load. Make sure your email is registered as a customer.</td></tr>';
+            document.getElementById('portalWelcome').innerHTML = '<p style="color:#c62828;font-size:14px">⚠ Your email is not linked to a customer account. Ask your manager to register your company.</p>';
+            return;
+        }
+        const data = await res.json();
+        document.getElementById('portalWelcome').innerHTML = `<p style="color:#388e3c;font-size:14px">✓ Welcome! You have <strong>${data.length}</strong> service request(s).</p>`;
+        if (!data.length) { tbody.innerHTML = '<tr><td colspan="7" class="loading">No requests yet. Click Raise New Request to submit one.</td></tr>'; return; }
+        tbody.innerHTML = data.map(w => `
+            <tr>
+                <td><strong>${w.code}</strong></td>
+                <td>${w.title}</td>
+                <td><span class="badge badge-${w.priority?.toLowerCase()}">${w.priority}</span></td>
+                <td><span class="badge badge-${statusClass(w.status)}">${formatStatus(w.status)}</span></td>
+                <td>${w.site?.name || '-'}</td>
+                <td style="font-size:12px">${w.slaDueAt ? formatDate(w.slaDueAt) : '-'}</td>
+                <td><button class="btn btn-sm btn-outline" onclick="viewWorkOrder(${w.id})">View</button></td>
+            </tr>`).join('');
+        await loadPortalSites();
+    } catch(e) { tbody.innerHTML = '<tr><td colspan="7" class="loading">Error loading</td></tr>'; }
+}
+
+async function loadPortalSites() {
+    const res = await apiFetch('/api/portal/my-sites');
+    if (!res || !res.ok) return;
+    const customer = await res.json();
+    if (!customer || !customer.id) return;
+    const sitesRes = await apiFetch(`/api/customers/${customer.id}/sites`);
+    if (!sitesRes || !sitesRes.ok) return;
+    const sites = await sitesRes.json();
+    const sel = document.getElementById('reqSite');
+    if (sel) {
+        sel.innerHTML = sites.length ? '<option value="">Select site...</option>' + sites.map(s => `<option value="${s.id}">${s.name}</option>`).join('') : '<option value="">No sites available</option>';
+    }
+}
+
+async function raiseRequest() {
+    const body = {
+        title:       document.getElementById('reqTitle').value,
+        description: document.getElementById('reqDesc').value,
+        priority:    document.getElementById('reqPriority').value,
+        siteId:      document.getElementById('reqSite').value
+    };
+    if (!body.title || !body.siteId) { showError('reqError', 'Title and site are required'); return; }
+    const res = await apiFetch('/api/portal/raise-request', { method: 'POST', body: JSON.stringify(body) });
+    if (res?.ok) {
+        closeModal('raiseRequestModal');
+        clearFields(['reqTitle','reqDesc']);
+        loadPortal();
+        showToast('Request submitted successfully!');
+    } else {
+        const e = await res?.text();
+        showError('reqError', 'Failed: ' + (e || 'Unknown error'));
+    }
+}
+
+async function loadUsers() {
+    const tbody = document.getElementById('usersTable');
+    tbody.innerHTML = '<tr><td colspan="6" class="loading">Loading...</td></tr>';
+    try {
+        const res = await apiFetch('/api/users/staff');
+        if (!res || !res.ok) { tbody.innerHTML = '<tr><td colspan="6" class="loading">No access</td></tr>'; return; }
+        const data = await res.json();
+        if (!data.length) { tbody.innerHTML = '<tr><td colspan="6" class="loading">No staff added yet. Click Add Staff to create accounts.</td></tr>'; return; }
+        tbody.innerHTML = data.map(u => `
+            <tr>
+                <td>${u.id}</td>
+                <td><strong>${u.userName}</strong></td>
+                <td>${u.userEmail}</td>
+                <td><span class="badge" style="background:${u.role==='TECHNICIAN'?'#fff3e0':'#e8eaf6'};color:${u.role==='TECHNICIAN'?'#e65100':'#3949ab'}">${u.role}</span></td>
+                <td>${u.phone || '-'}</td>
+                <td><button class="btn btn-sm btn-danger" onclick="deleteStaff(${u.id}, '${u.userName}')">Remove</button></td>
+            </tr>`).join('');
+    } catch(e) { tbody.innerHTML = '<tr><td colspan="6" class="loading">Error loading</td></tr>'; }
+}
+
+async function addStaff() {
+    const body = {
+        userName: document.getElementById('staffName').value,
+        userEmail: document.getElementById('staffEmail').value,
+        password: document.getElementById('staffPassword').value,
+        phone: document.getElementById('staffPhone').value,
+        role: document.getElementById('staffRole').value
+    };
+    if (!body.userName || !body.userEmail || !body.password) { showError('staffError', 'Name, email and password are required'); return; }
+    const res = await apiFetch('/api/users/staff', { method: 'POST', body: JSON.stringify(body) });
+    if (res?.ok) {
+        closeModal('addUserModal');
+        clearFields(['staffName','staffEmail','staffPassword','staffPhone']);
+        loadUsers();
+        showToast(`${body.role} account created for ${body.userEmail}`);
+    } else {
+        const e = await res?.text();
+        showError('staffError', e || 'Failed to create user');
+    }
+}
+
+async function deleteStaff(id, name) {
+    if (!confirm(`Remove ${name} from the system?`)) return;
+    const res = await apiFetch(`/api/users/staff/${id}`, { method: 'DELETE' });
+    if (res?.ok) { loadUsers(); showToast(`${name} removed`); }
+    else { alert('Failed to remove user'); }
+}
+
 function showModal(id) {
     document.getElementById(id).classList.add('open');
     if (id === 'addWorkOrderModal') loadCustomersForWO();
 }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
-// ── Toast notification ────────────────────────────────────────────────────
 function showToast(msg) {
     let t = document.getElementById('toast');
     if (!t) {
@@ -550,28 +564,15 @@ function showToast(msg) {
         t.style.cssText = 'position:fixed;bottom:24px;right:24px;background:#1e3a5f;color:white;padding:12px 20px;border-radius:8px;font-size:14px;z-index:9999;box-shadow:0 4px 15px rgba(0,0,0,0.2);transition:opacity 0.3s';
         document.body.appendChild(t);
     }
-    t.textContent = msg;
-    t.style.opacity = '1';
+    t.textContent = msg; t.style.opacity = '1';
     clearTimeout(t._timer);
     t._timer = setTimeout(() => { t.style.opacity = '0'; }, 3000);
 }
 
-// ── Utilities ─────────────────────────────────────────────────────────────
 function showError(id, msg) { const el = document.getElementById(id); if(el){el.textContent=msg;el.style.display='block';} }
 function showSuccess(id, msg) { const el = document.getElementById(id); if(el){el.textContent=msg;el.style.display='block';} }
 function clearFields(ids) { ids.forEach(id => { const el = document.getElementById(id); if(el) el.value=''; }); }
-
-function statusClass(s) {
-    return { NEW:'new', ASSIGNED:'assigned', IN_PROGRESS:'inprogress', ON_HOLD:'onhold', COMPLETED:'completed', CLOSED:'closed', CANCELLED:'cancelled' }[s] || 'new';
-}
-function formatStatus(s) {
-    return { NEW:'New', ASSIGNED:'Assigned', IN_PROGRESS:'In Progress', ON_HOLD:'On Hold', COMPLETED:'Completed', CLOSED:'Closed', CANCELLED:'Cancelled' }[s] || s;
-}
-function formatDate(d) {
-    if (!d) return '-';
-    return new Date(d).toLocaleString('en-IN', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
-}
-function isSlaWarning(d) {
-    if (!d) return false;
-    return new Date(d) < new Date(Date.now() + 2 * 60 * 60 * 1000);
-}
+function statusClass(s) { return { NEW:'new', ASSIGNED:'assigned', IN_PROGRESS:'inprogress', ON_HOLD:'onhold', COMPLETED:'completed', CLOSED:'closed', CANCELLED:'cancelled' }[s] || 'new'; }
+function formatStatus(s) { return { NEW:'New', ASSIGNED:'Assigned', IN_PROGRESS:'In Progress', ON_HOLD:'On Hold', COMPLETED:'Completed', CLOSED:'Closed', CANCELLED:'Cancelled' }[s] || s; }
+function formatDate(d) { if (!d) return '-'; return new Date(d).toLocaleString('en-IN', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }); }
+function isSlaWarning(d) { if (!d) return false; return new Date(d) < new Date(Date.now() + 2 * 60 * 60 * 1000); }

@@ -37,10 +37,8 @@ public class Site {
     @JoinColumn(name = "customer_id", nullable = false)
     private Customer customer;
 
-    // Constructors
     public Site() {}
 
-    // Getters and Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 

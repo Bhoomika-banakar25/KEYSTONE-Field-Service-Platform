@@ -14,4 +14,6 @@ public interface UserAuthRepository extends JpaRepository<UserAuth, Long> {
 
     Optional<UserAuth> findByResetToken(String resetToken);
 
+    java.util.List<UserAuth> findByRole(com.EMP_Management_COMP.ManageByHR.ENUM.Role role);
+
 }

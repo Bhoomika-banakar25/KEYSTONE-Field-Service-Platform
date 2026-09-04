@@ -168,3 +168,14 @@ src/main/resources/
 ## Author
 
 Bhoomika B V — Java Full-Stack Engineering Intern, Zidio Development
+
+---
+
+## Future Enhancements
+
+- **Grant/Revoke Dispatch Rights** — Manager can temporarily delegate work order assignment rights to a Dispatcher when unavailable, and revoke them upon return.
+- **Real-time notifications** — WebSocket-based live updates when work order status changes.
+- **Technician availability/skills** — Dispatcher can filter technicians by skill set and current workload before assigning.
+- **Audit log viewer** — Visual timeline of all status changes per work order in the UI.
+- **Mobile-optimised technician view** — Progressive Web App (PWA) for offline-capable field updates.
+- **SLA escalation alerts** — Automated escalation emails to manager when a job is at risk of breaching SLA.
