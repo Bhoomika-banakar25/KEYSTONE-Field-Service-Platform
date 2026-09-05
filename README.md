@@ -1,4 +1,4 @@
-# KEYSTONE — Field Service Management Platform
+ KEYSTONE — Field Service Management Platform
 
 A full-stack field service management platform built with Spring Boot, MySQL, and vanilla JavaScript. It manages the complete lifecycle of maintenance work orders — from customer request to job closure — with role-based access for Managers, Dispatchers, Technicians, and Customers.
 
@@ -84,10 +84,6 @@ spring.mail.properties.mail.smtp.starttls.enable=true
 ```
 http://localhost:9899/index.html
 ```
-
-**6. Load sample data (optional)**
-
-Run `seed_data.sql` in MySQL Workbench to insert sample customers, sites, work orders, and parts.
 
 ---
 
@@ -176,6 +172,3 @@ Bhoomika B V — Java Full-Stack Engineering Intern, Zidio Development
 - **Grant/Revoke Dispatch Rights** — Manager can temporarily delegate work order assignment rights to a Dispatcher when unavailable, and revoke them upon return.
 - **Real-time notifications** — WebSocket-based live updates when work order status changes.
 - **Technician availability/skills** — Dispatcher can filter technicians by skill set and current workload before assigning.
-- **Audit log viewer** — Visual timeline of all status changes per work order in the UI.
-- **Mobile-optimised technician view** — Progressive Web App (PWA) for offline-capable field updates.
-- **SLA escalation alerts** — Automated escalation emails to manager when a job is at risk of breaching SLA.

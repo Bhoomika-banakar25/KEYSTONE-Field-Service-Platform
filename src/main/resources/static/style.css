@@ -147,9 +147,56 @@ body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; color: #333; }
         );
     pointer-events: none;
 }
-.home-box { background: rgba(255,255,255,0.95); padding: 50px 60px; border-radius: 20px; width: 580px; box-shadow: 0 30px 80px rgba(0,0,0,0.6), 0 0 40px rgba(138,43,226,0.3); text-align: center; position: relative; z-index: 1; }
+/* split screen */
+.home-container.split-mode { justify-content: flex-start; align-items: stretch; }
+.home-container.split-mode .home-box {
+    width: 50%;
+    border-radius: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 40px 50px;
+    box-shadow: 4px 0 30px rgba(0,0,0,0.3);
+    background: transparent;
+    color: white;
+}
+.home-container.split-mode .home-box .home-logo h1 { color: white; }
+.home-container.split-mode .home-box .home-subtitle { color: rgba(255,255,255,0.85); }
+.home-container.split-mode .home-box .home-desc { color: rgba(255,255,255,0.65); }
+.home-container.split-mode .home-box .home-register { color: rgba(255,255,255,0.5); }
+
+.split-login-panel {
+    display: none;
+    width: 50%;
+    background: linear-gradient(135deg, #0d0b2e 0%, #1a3a6f 50%, #0d0b2e 100%);
+    min-height: 100vh;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    padding: 40px;
+    animation: slideIn 0.4s ease;
+}
+.split-login-panel.active { display: flex; }
+@keyframes slideIn { from { transform: translateX(60px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+.split-login-panel .logo { text-align: center; margin-bottom: 20px; }
+.split-login-panel .logo h1 { font-size: 26px; color: white; }
+.split-login-panel .login-role-badge { display: inline-block; padding: 4px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; margin-bottom: 6px; color: white; }
+.split-login-panel #loginRoleTitle { font-size: 16px; color: rgba(255,255,255,0.9); margin: 4px 0; }
+.split-login-panel #loginRoleDesc { font-size: 12px; color: rgba(255,255,255,0.6); margin-bottom: 16px; }
+.split-login-panel .form-group { width: 100%; max-width: 340px; }
+.split-login-panel .form-group label { color: rgba(255,255,255,0.85); }
+.split-login-panel .form-group input { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); color: white; }
+.split-login-panel .form-group input::placeholder { color: rgba(255,255,255,0.4); }
+.split-login-panel .form-group input:focus { border-color: rgba(255,255,255,0.7); background: rgba(255,255,255,0.15); outline: none; }
+.split-login-panel .btn-full { max-width: 340px; background: linear-gradient(135deg, #6f42c1, #3a7bd5); border: none; }
+.split-login-panel .btn-full:hover { filter: brightness(1.1); }
+.split-login-panel #loginError { max-width: 340px; width: 100%; margin: 0 0 10px; background: rgba(220,53,69,0.2); border: 1px solid rgba(220,53,69,0.5); color: #ff8080; }
+.split-login-panel #registerHint { max-width: 340px; color: rgba(255,255,255,0.7); }
+.split-login-panel #registerHint a { color: #a78bfa; }
+.split-login-panel .register-link a { color: rgba(255,255,255,0.5); }
+.home-box { background: rgba(255,255,255,0.95); padding: 50px 60px; border-radius: 20px; width: 580px; box-shadow: 0 30px 80px rgba(0,0,0,0.6), 0 0 40px rgba(138,43,226,0.3); text-align: center; position: relative; z-index: 1; transition: all 0.4s ease; }
 .home-logo { margin-bottom: 36px; }
-.logo-icon { font-size: 56px; margin-bottom: 10px; }
 .home-logo h1 { font-size: 36px; color: #1a0050; font-weight: 800; letter-spacing: 2px; margin-bottom: 6px; }
 .home-subtitle { font-size: 15px; color: #6f42c1; font-weight: 600; margin-bottom: 8px; }
 .home-desc { font-size: 14px; color: #888; margin-bottom: 0; }
