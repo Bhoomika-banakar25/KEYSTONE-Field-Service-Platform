@@ -12,7 +12,6 @@
     <div class="home-container">
         <div class="home-box">
             <div class="home-logo">
-                <div class="logo-icon">🔑</div>
                 <h1>KEYSTONE</h1>
                 <p class="home-subtitle">Field Service Management Platform</p>
                 <p class="home-desc">Please select your login type to proceed.</p>
@@ -37,16 +36,12 @@
             </div>
             <p class="home-register">Meridian Facilities Management &copy; 2026</p>
         </div>
-    </div>
-</div>
 
-
-<div id="loginPage" class="page">
-    <div class="login-container">
-        <div class="login-box">
+        <!-- SPLIT LOGIN PANEL -->
+        <div class="split-login-panel" id="splitLoginPanel">
             <div class="logo">
                 <div class="login-role-badge" id="loginRoleBadge"></div>
-                <h1>🔑 KEYSTONE</h1>
+                <h1>KEYSTONE</h1>
                 <p id="loginRoleTitle">Login</p>
                 <p id="loginRoleDesc" style="font-size:12px;color:#aaa;margin-top:4px"></p>
             </div>
@@ -54,19 +49,20 @@
             <input type="hidden" id="expectedRole" value="">
             <div class="form-group">
                 <label>Email</label>
-                <input type="email" id="loginEmail" placeholder="Enter your email">
+                <input type="email" id="loginEmail" placeholder="Enter your email" autocomplete="off">
             </div>
             <div class="form-group">
                 <label>Password</label>
-                <input type="password" id="loginPassword" placeholder="Enter your password">
+                <input type="password" id="loginPassword" placeholder="Enter your password" autocomplete="new-password">
             </div>
             <button class="btn btn-primary btn-full" onclick="login()">Login</button>
-            <p id="registerHint" class="register-link" style="display:none;margin-top:12px">
+            <p id="registerHint" class="register-link" style="display:none;margin-top:12px;text-align:center">
                 New customer? <a href="#" onclick="showRegister()">Register here</a>
             </p>
-            <p class="register-link" style="margin-top:10px">
-                <a href="#" onclick="showPage('homePage')" style="color:#888;font-size:13px">← Back to Home</a>
+            <p class="register-link" style="margin-top:10px;text-align:center">
+                <a href="#" onclick="closeSplit()" style="color:#888;font-size:13px">← Back to Home</a>
             </p>
+        </div>
         </div>
     </div>
 </div>
@@ -118,12 +114,13 @@
     <nav class="navbar">
         <div class="nav-brand">🔑 KEYSTONE</div>
         <div class="nav-menu">
-            <a href="#" class="nav-item active" onclick="showSection('dashboard',this)">Dashboard</a>
+            <a href="#" class="nav-item active" id="navDashboard" onclick="showSection('dashboard',this)">Dashboard</a>
             <a href="#" class="nav-item" id="navCustomers" onclick="showSection('customers',this)">Customers</a>
             <a href="#" class="nav-item" id="navWorkOrders" onclick="showSection('workorders',this)">Work Orders</a>
             <a href="#" class="nav-item" id="navParts" onclick="showSection('parts',this)">Parts</a>
             <a href="#" class="nav-item" id="navUsers" onclick="showSection('users',this)" style="display:none">Users</a>
             <a href="#" class="nav-item" id="navPortal" onclick="showSection('portal',this)" style="display:none">My Requests</a>
+            <a href="#" class="nav-item" id="navTechDashboard" onclick="showSection('tech-dashboard',this)" style="display:none">My Dashboard</a>
         </div>
         <div class="nav-right">
             <span id="userInfo" class="user-info"></span>
@@ -142,7 +139,6 @@
             <div class="stat-card orange"><div class="stat-number" id="statInProgress">-</div><div class="stat-label">In Progress</div></div>
             <div class="stat-card purple"><div class="stat-number" id="statCompleted">-</div><div class="stat-label">Completed</div></div>
             <div class="stat-card teal"><div class="stat-number" id="statClosed">-</div><div class="stat-label">Closed</div></div>
-            <div class="stat-card red"><div class="stat-number" id="statBreached">-</div><div class="stat-label">SLA Breached</div></div>
         </div>
     </div>
 
@@ -213,8 +209,30 @@
         </div>
         <div class="table-container">
             <table class="data-table">
-                <thead><tr><th>Code</th><th>Title</th><th>Priority</th><th>Status</th><th>Site</th><th>SLA Due</th><th>Actions</th></tr></thead>
-                <tbody id="portalTable"><tr><td colspan="7" class="loading">Loading your requests...</td></tr></tbody>
+                <thead><tr><th>Code</th><th>Title</th><th>Priority</th><th>Status</th><th>Site</th><th>Actions</th></tr></thead>
+                <tbody id="portalTable"><tr><td colspan="6" class="loading">Loading your requests...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- TECHNICIAN DASHBOARD -->
+    <div id="section-tech-dashboard" class="section">
+        <div class="section-header">
+            <h2>My Dashboard</h2>
+        </div>
+        <div class="stats-grid" id="techStatsGrid">
+            <div class="stat-card blue"><div class="stat-number" id="statTechTotal">-</div><div class="stat-label">Assigned to Me</div></div>
+            <div class="stat-card orange"><div class="stat-number" id="statTechProgress">-</div><div class="stat-label">In Progress</div></div>
+            <div class="stat-card green"><div class="stat-number" id="statTechCompleted">-</div><div class="stat-label">Completed</div></div>
+            <div class="stat-card purple"><div class="stat-number" id="statTechFeedback">-</div><div class="stat-label">Feedback Received</div></div>
+        </div>
+        <div class="section-header" style="margin-top:20px">
+            <h2>My Work Orders</h2>
+        </div>
+        <div class="table-container">
+            <table class="data-table">
+                <thead><tr><th>Code</th><th>Title</th><th>Priority</th><th>Status</th><th>Customer</th><th>Actions</th></tr></thead>
+                <tbody id="techWorkOrdersTable"><tr><td colspan="6" class="loading">Loading...</td></tr></tbody>
             </table>
         </div>
     </div>
@@ -304,6 +322,11 @@
             <label>Site</label>
             <select id="reqSite"><option value="">Loading your sites...</option></select>
         </div>
+        <div class="form-group">
+            <label>Photo of Problem <span style="color:#aaa;font-size:12px">(optional)</span></label>
+            <input type="file" id="reqPhoto" accept="image/*" onchange="previewPhoto('reqPhoto','reqPhotoPreview')" style="padding:6px">
+            <img id="reqPhotoPreview" src="" alt="Preview" style="display:none;max-width:100%;max-height:180px;border-radius:8px;margin-top:8px;border:1px solid #ddd">
+        </div>
         <div id="reqError" class="error-msg" style="display:none"></div>
         <div class="modal-footer">
             <button class="btn btn-outline" onclick="closeModal('raiseRequestModal')">Cancel</button>
@@ -342,6 +365,36 @@
         <div class="modal-footer">
             <button class="btn btn-outline" onclick="closeModal('addUserModal')">Cancel</button>
             <button class="btn btn-primary" onclick="addStaff()">Add Staff</button>
+        </div>
+    </div>
+</div>
+
+<div id="feedbackModal" class="modal">
+    <div class="modal-box">
+        <div class="modal-header"><h3>⭐ Give Feedback</h3><span onclick="closeModal('feedbackModal')" class="close-btn">✕</span></div>
+        <input type="hidden" id="feedbackWoId">
+        <div class="form-group">
+            <label>Rating</label>
+            <div style="display:flex;gap:8px;font-size:28px;margin-top:4px">
+                <span class="star-btn" onclick="updateStars(1)" style="cursor:pointer;color:#ccc">★</span>
+                <span class="star-btn" onclick="updateStars(2)" style="cursor:pointer;color:#ccc">★</span>
+                <span class="star-btn" onclick="updateStars(3)" style="cursor:pointer;color:#ccc">★</span>
+                <span class="star-btn" onclick="updateStars(4)" style="cursor:pointer;color:#ccc">★</span>
+                <span class="star-btn" onclick="updateStars(5)" style="cursor:pointer;color:#ccc">★</span>
+            </div>
+            <input type="hidden" id="feedbackRating" value="5">
+        </div>
+        <div class="form-group"><label>Comment</label><textarea id="feedbackComment" placeholder="How was the service? Any suggestions..." rows="3"></textarea></div>
+        <div class="form-group">
+            <label>Photo (optional — after work)</label>
+            <input type="file" id="feedbackPhotoInput" accept="image/*" onchange="previewPhoto('feedbackPhotoInput','feedbackPhotoPreview')" style="padding:6px">
+            <img id="feedbackPhotoPreview" src="" alt="Preview" style="display:none;max-width:100%;max-height:180px;border-radius:8px;margin-top:8px;border:1px solid #ddd">
+        </div>
+        <div id="feedbackError" class="error-msg" style="display:none"></div>
+        <div id="feedbackSuccess" class="error-msg" style="display:none;color:#388e3c;background:#f1f8f1"></div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeModal('feedbackModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="submitFeedback()">Submit Feedback</button>
         </div>
     </div>
 </div>

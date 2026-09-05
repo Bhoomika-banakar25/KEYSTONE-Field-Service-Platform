@@ -12,9 +12,8 @@ window.onload = () => {
 };
 
 function goToLogin(role) {
-    showPage('loginPage');
-    const labels = { MANAGER: '👔 Manager Login', DISPATCHER: '📋 Dispatcher Login', TECHNICIAN: '🔧 Technician Login', CUSTOMER: '🏢 Customer Login' };
     const colors = { MANAGER: '#1a0050', DISPATCHER: '#0a0060', TECHNICIAN: '#c1007a', CUSTOMER: '#006080' };
+    const labels = { MANAGER: '👔 Manager Login', DISPATCHER: '📋 Dispatcher Login', TECHNICIAN: '🔧 Technician Login', CUSTOMER: '🏢 Customer Login' };
     const descs  = {
         MANAGER:    'Access dashboard, work orders, customers, reports & full control',
         DISPATCHER: 'Create & assign work orders, manage customers and sites',
@@ -29,7 +28,24 @@ function goToLogin(role) {
     document.getElementById('expectedRole').value = role;
     document.getElementById('loginError').style.display = 'none';
     document.getElementById('registerHint').style.display = role === 'CUSTOMER' ? 'block' : 'none';
+
+    const container = document.querySelector('.home-container');
+    const panel = document.getElementById('splitLoginPanel');
+    container.classList.add('split-mode');
+    panel.classList.add('active');
+    document.getElementById('loginEmail').value = '';
+    document.getElementById('loginPassword').value = '';
     document.getElementById('loginEmail').focus();
+}
+
+function closeSplit() {
+    const container = document.querySelector('.home-container');
+    const panel = document.getElementById('splitLoginPanel');
+    container.classList.remove('split-mode');
+    panel.classList.remove('active');
+    document.getElementById('loginEmail').value = '';
+    document.getElementById('loginPassword').value = '';
+    document.getElementById('loginError').style.display = 'none';
 }
 
 async function login() {
@@ -103,6 +119,8 @@ function showDashboard() {
     applyRoleVisibility();
     if (userRole === 'CUSTOMER') {
         showSection('portal', document.getElementById('navPortal'));
+    } else if (userRole === 'TECHNICIAN') {
+        showSection('tech-dashboard', document.getElementById('navTechDashboard'));
     } else {
         showSection('dashboard', null);
     }
@@ -111,13 +129,16 @@ function showDashboard() {
 function applyRoleVisibility() {
     const isManager    = ['MANAGER', 'ADMIN'].includes(userRole);
     const isDispatcher = userRole === 'DISPATCHER';
+    const isTechnician = userRole === 'TECHNICIAN';
     const isCustomer   = userRole === 'CUSTOMER';
 
-    document.getElementById('navCustomers').style.display  = (isManager || isDispatcher) ? '' : 'none';
-    document.getElementById('navParts').style.display      = (isManager || isDispatcher) ? '' : 'none';
-    document.getElementById('navPortal').style.display     = isCustomer ? '' : 'none';
-    document.getElementById('navWorkOrders').style.display = isCustomer ? 'none' : '';
-    document.getElementById('navUsers').style.display      = isManager ? '' : 'none';
+    document.getElementById('navDashboard').style.display     = (isManager || isDispatcher) ? '' : 'none';
+    document.getElementById('navCustomers').style.display     = (isManager || isDispatcher) ? '' : 'none';
+    document.getElementById('navParts').style.display         = (isManager || isDispatcher) ? '' : 'none';
+    document.getElementById('navPortal').style.display        = isCustomer ? '' : 'none';
+    document.getElementById('navWorkOrders').style.display    = (isManager || isDispatcher) ? '' : 'none';
+    document.getElementById('navUsers').style.display         = isManager ? '' : 'none';
+    document.getElementById('navTechDashboard').style.display = isTechnician ? '' : 'none';
 
     const addWoBtn   = document.getElementById('addWoBtn');
     const addCustBtn = document.getElementById('addCustBtn');
@@ -133,12 +154,13 @@ function showSection(name, el) {
     document.getElementById('section-' + name).classList.add('active');
     if (el) el.classList.add('active');
 
-    if (name === 'dashboard')  loadDashboard();
-    if (name === 'customers')  loadCustomers();
-    if (name === 'workorders') loadWorkOrders();
-    if (name === 'parts')      loadParts();
-    if (name === 'portal')     loadPortal();
-    if (name === 'users')      loadUsers();
+    if (name === 'dashboard')      loadDashboard();
+    if (name === 'customers')      loadCustomers();
+    if (name === 'workorders')     loadWorkOrders();
+    if (name === 'parts')          loadParts();
+    if (name === 'portal')         loadPortal();
+    if (name === 'users')          loadUsers();
+    if (name === 'tech-dashboard') loadTechDashboard();
 }
 
 function authHeader() {
@@ -157,12 +179,11 @@ async function loadDashboard() {
         const res = await apiFetch('/api/reports/summary');
         if (!res || !res.ok) return;
         const data = await res.json();
-        document.getElementById('statTotal').textContent      = data.total       || 0;
-        document.getElementById('statNew').textContent        = data.new         || 0;
-        document.getElementById('statInProgress').textContent = data.inProgress  || 0;
-        document.getElementById('statCompleted').textContent  = data.completed   || 0;
-        document.getElementById('statClosed').textContent     = data.closed      || 0;
-        document.getElementById('statBreached').textContent   = data.slaBreached || 0;
+        document.getElementById('statTotal').textContent      = data.total      || 0;
+        document.getElementById('statNew').textContent        = data.new        || 0;
+        document.getElementById('statInProgress').textContent = data.inProgress || 0;
+        document.getElementById('statCompleted').textContent  = data.completed  || 0;
+        document.getElementById('statClosed').textContent     = data.closed     || 0;
     } catch(e) {}
 }
 
@@ -250,9 +271,9 @@ async function loadWorkOrders() {
                 <td><strong>${w.code}</strong></td>
                 <td>${w.title}</td>
                 <td><span class="badge badge-${w.priority?.toLowerCase()}">${w.priority}</span></td>
-                <td><span class="badge badge-${statusClass(w.status)}">${formatStatus(w.status)}</span>${w.slaBreached ? ' <span style="color:#c62828;font-size:11px">⚠ SLA</span>' : ''}</td>
+                <td><span class="badge badge-${statusClass(w.status)}">${formatStatus(w.status)}</span></td>
                 <td>${w.customer?.companyName || '-'}</td>
-                <td style="font-size:12px;color:${isSlaWarning(w.slaDueAt)?'#e65100':'#555'}">${w.slaDueAt ? formatDate(w.slaDueAt) : '-'}</td>
+                <td style="font-size:12px">${w.slaDueAt ? formatDate(w.slaDueAt) : '-'}</td>
                 <td><button class="btn btn-sm btn-primary" onclick="viewWorkOrder(${w.id})">View</button></td>
             </tr>`).join('');
     } catch(e) { tbody.innerHTML = '<tr><td colspan="7" class="loading">Error loading</td></tr>'; }
@@ -285,10 +306,15 @@ async function addWorkOrder() {
 }
 
 async function viewWorkOrder(id) {
-    const [woRes, histRes] = await Promise.all([apiFetch(`/api/work-orders/${id}`), apiFetch(`/api/work-orders/${id}/history`)]);
+    const [woRes, histRes, feedbackRes] = await Promise.all([
+        apiFetch(`/api/work-orders/${id}`),
+        apiFetch(`/api/work-orders/${id}/history`),
+        apiFetch(`/api/work-orders/${id}/feedback`)
+    ]);
     if (!woRes) return;
     const wo = await woRes.json();
-    const history = histRes ? await histRes.json() : [];
+    const history  = histRes    ? await histRes.json()    : [];
+    const feedback = feedbackRes?.ok ? await feedbackRes.json() : null;
     const transitions = getAvailableTransitions(wo.status);
     const canAssign  = ['MANAGER','ADMIN','DISPATCHER'].includes(userRole);
     const canLogWork = ['TECHNICIAN','EMPLOYEE','MANAGER','ADMIN'].includes(userRole);
@@ -301,10 +327,9 @@ async function viewWorkOrder(id) {
             <div class="detail-item"><label>Customer</label><span>${wo.customer?.companyName || '-'}</span></div>
             <div class="detail-item"><label>Site</label><span>${wo.site?.name || '-'}</span></div>
             <div class="detail-item"><label>Assigned To</label><span>${wo.assignedTo?.userName || '— Not assigned —'}</span></div>
-            <div class="detail-item"><label>SLA Due</label><span style="color:${isSlaWarning(wo.slaDueAt)?'#e65100':'#333'}">${wo.slaDueAt ? formatDate(wo.slaDueAt) : '-'}</span></div>
-            <div class="detail-item"><label>SLA Breached</label><span style="color:${wo.slaBreached?'#c62828':'#388e3c'}">${wo.slaBreached ? '⚠ YES' : '✓ No'}</span></div>
             <div class="detail-item"><label>Created</label><span>${wo.createdAt ? formatDate(wo.createdAt) : '-'}</span></div>
             <div class="detail-item" style="grid-column:1/-1"><label>Description</label><span>${wo.description || '—'}</span></div>
+            ${wo.problemPhoto ? `<div class="detail-item" style="grid-column:1/-1"><label>Problem Photo</label><br><img src="${wo.problemPhoto}" style="max-width:100%;max-height:300px;border-radius:8px;margin-top:8px;border:1px solid #ddd"></div>` : ''}
         </div>
         ${transitions.length ? `<div class="transition-buttons"><strong style="font-size:13px;color:#555;margin-right:8px">Change Status:</strong>${transitions.map(t => `<button class="btn btn-sm ${t.cls}" onclick="transition(${id},'${t.status}')">${t.label}</button>`).join('')}</div>` : ''}
         ${canAssign && wo.status !== 'CLOSED' && wo.status !== 'CANCELLED' ? `
@@ -326,6 +351,14 @@ async function viewWorkOrder(id) {
                 <div><label style="font-size:12px;color:#888;display:block">Note</label><input id="timeNote" type="text" placeholder="Optional" style="padding:7px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;width:180px"></div>
                 <button class="btn btn-sm btn-success" onclick="logTime(${id})">Log Time</button>
             </div>
+        </div>` : ''}
+        ${feedback ? `
+        <div style="padding:16px 24px;border-top:1px solid #f0f0f0;background:#f9fff9;border-radius:0 0 8px 8px">
+            <h4 style="color:#2e7d32;margin-bottom:10px">⭐ Customer Feedback</h4>
+            <div style="display:flex;gap:6px;margin-bottom:8px">${'★'.repeat(feedback.rating)}${'☆'.repeat(5 - feedback.rating)}</div>
+            <p style="color:#333;margin-bottom:8px">${feedback.comment || 'No comment'}</p>
+            ${feedback.feedbackPhoto ? `<img src="${feedback.feedbackPhoto}" style="max-width:100%;max-height:220px;border-radius:8px;border:1px solid #ddd">` : ''}
+            <p style="font-size:12px;color:#888;margin-top:8px">Submitted by ${feedback.submittedBy} on ${formatDate(feedback.submittedAt)}</p>
         </div>` : ''}
         <div class="history-table">
             <h4>Status History</h4>
@@ -461,8 +494,10 @@ async function loadPortal() {
                 <td><span class="badge badge-${w.priority?.toLowerCase()}">${w.priority}</span></td>
                 <td><span class="badge badge-${statusClass(w.status)}">${formatStatus(w.status)}</span></td>
                 <td>${w.site?.name || '-'}</td>
-                <td style="font-size:12px">${w.slaDueAt ? formatDate(w.slaDueAt) : '-'}</td>
-                <td><button class="btn btn-sm btn-outline" onclick="viewWorkOrder(${w.id})">View</button></td>
+                <td>
+                    <button class="btn btn-sm btn-outline" onclick="viewWorkOrder(${w.id})">View</button>
+                    ${(w.status === 'COMPLETED' || w.status === 'CLOSED') ? `<button class="btn btn-sm btn-success" style="margin-left:4px" onclick="openFeedbackModal(${w.id})">⭐ Feedback</button>` : ''}
+                </td>
             </tr>`).join('');
         await loadPortalSites();
     } catch(e) { tbody.innerHTML = '<tr><td colspan="7" class="loading">Error loading</td></tr>'; }
@@ -483,17 +518,25 @@ async function loadPortalSites() {
 }
 
 async function raiseRequest() {
+    const photoInput = document.getElementById('reqPhoto');
+    let problemPhoto = '';
+    if (photoInput && photoInput.files && photoInput.files[0]) {
+        problemPhoto = await toBase64(photoInput.files[0]);
+    }
     const body = {
-        title:       document.getElementById('reqTitle').value,
-        description: document.getElementById('reqDesc').value,
-        priority:    document.getElementById('reqPriority').value,
-        siteId:      document.getElementById('reqSite').value
+        title:        document.getElementById('reqTitle').value,
+        description:  document.getElementById('reqDesc').value,
+        priority:     document.getElementById('reqPriority').value,
+        siteId:       document.getElementById('reqSite').value,
+        problemPhoto: problemPhoto
     };
     if (!body.title || !body.siteId) { showError('reqError', 'Title and site are required'); return; }
     const res = await apiFetch('/api/portal/raise-request', { method: 'POST', body: JSON.stringify(body) });
     if (res?.ok) {
         closeModal('raiseRequestModal');
         clearFields(['reqTitle','reqDesc']);
+        if (photoInput) photoInput.value = '';
+        document.getElementById('reqPhotoPreview').style.display = 'none';
         loadPortal();
         showToast('Request submitted successfully!');
     } else {
@@ -555,6 +598,98 @@ function showModal(id) {
     if (id === 'addWorkOrderModal') loadCustomersForWO();
 }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+async function loadTechDashboard() {
+    try {
+        const res = await apiFetch('/api/reports/my-summary');
+        if (!res || !res.ok) return;
+        const data = await res.json();
+        document.getElementById('statTechTotal').textContent     = data.totalAssigned ?? '-';
+        document.getElementById('statTechProgress').textContent  = data.inProgress    ?? '-';
+        document.getElementById('statTechCompleted').textContent = data.completed     ?? '-';
+        document.getElementById('statTechFeedback').textContent  = data.feedbackCount ?? '-';
+    } catch(e) {}
+
+    const tbody = document.getElementById('techWorkOrdersTable');
+    tbody.innerHTML = '<tr><td colspan="6" class="loading">Loading...</td></tr>';
+    try {
+        const res = await apiFetch('/api/work-orders/my');
+        if (!res || !res.ok) {
+            tbody.innerHTML = '<tr><td colspan="6" class="loading">Unable to load jobs</td></tr>';
+            return;
+        }
+        const data = await res.json();
+        if (!data.length) { tbody.innerHTML = '<tr><td colspan="6" class="loading">No work orders assigned to you yet</td></tr>'; return; }
+        tbody.innerHTML = data.map(w => `
+            <tr>
+                <td><strong>${w.code}</strong></td>
+                <td>${w.title}</td>
+                <td><span class="badge badge-${w.priority?.toLowerCase()}">${w.priority}</span></td>
+                <td><span class="badge badge-${statusClass(w.status)}">${formatStatus(w.status)}</span></td>
+                <td>${w.customer?.companyName || '-'}</td>
+                <td><button class="btn btn-sm btn-primary" onclick="viewWorkOrder(${w.id})">View</button></td>
+            </tr>`).join('');
+    } catch(e) { tbody.innerHTML = '<tr><td colspan="6" class="loading">Error loading</td></tr>'; }
+}
+
+function openFeedbackModal(workOrderId) {
+    document.getElementById('feedbackWoId').value = workOrderId;
+    document.getElementById('feedbackRating').value = '5';
+    document.getElementById('feedbackComment').value = '';
+    document.getElementById('feedbackPhotoInput').value = '';
+    document.getElementById('feedbackPhotoPreview').style.display = 'none';
+    document.getElementById('feedbackError').style.display = 'none';
+    document.getElementById('feedbackSuccess').style.display = 'none';
+    updateStars(5);
+    showModal('feedbackModal');
+}
+
+function updateStars(val) {
+    document.getElementById('feedbackRating').value = val;
+    document.querySelectorAll('.star-btn').forEach((btn, i) => {
+        btn.style.color = i < val ? '#f59e0b' : '#ccc';
+    });
+}
+
+async function submitFeedback() {
+    const workOrderId = document.getElementById('feedbackWoId').value;
+    const rating      = parseInt(document.getElementById('feedbackRating').value);
+    const comment     = document.getElementById('feedbackComment').value;
+    const photoInput  = document.getElementById('feedbackPhotoInput');
+    let feedbackPhoto = '';
+    if (photoInput && photoInput.files && photoInput.files[0]) {
+        feedbackPhoto = await toBase64(photoInput.files[0]);
+    }
+    if (!rating || rating < 1 || rating > 5) { showError('feedbackError', 'Please select a star rating'); return; }
+    const res = await apiFetch(`/api/portal/feedback/${workOrderId}`, {
+        method: 'POST',
+        body: JSON.stringify({ rating, comment, feedbackPhoto })
+    });
+    if (res?.ok) {
+        showSuccess('feedbackSuccess', 'Feedback submitted! Thank you.');
+        setTimeout(() => { closeModal('feedbackModal'); loadPortal(); }, 1500);
+    } else {
+        showError('feedbackError', 'Failed to submit feedback. Please try again.');
+    }
+}
+
+function previewPhoto(inputId, previewId) {
+    const input   = document.getElementById(inputId);
+    const preview = document.getElementById(previewId);
+    if (!input || !input.files || !input.files[0]) return;
+    const reader = new FileReader();
+    reader.onload = e => { preview.src = e.target.result; preview.style.display = 'block'; };
+    reader.readAsDataURL(input.files[0]);
+}
+
+function toBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload  = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
 
 function showToast(msg) {
     let t = document.getElementById('toast');

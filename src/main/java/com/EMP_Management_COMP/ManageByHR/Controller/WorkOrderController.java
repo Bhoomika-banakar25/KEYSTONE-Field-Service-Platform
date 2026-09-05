@@ -17,10 +17,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.EMP_Management_COMP.ManageByHR.ENUM.Priority;
 import com.EMP_Management_COMP.ManageByHR.ENUM.WorkOrderStatus;
+import com.EMP_Management_COMP.ManageByHR.Entity.Feedback;
 import com.EMP_Management_COMP.ManageByHR.Entity.PartUsage;
 import com.EMP_Management_COMP.ManageByHR.Entity.TimeLog;
 import com.EMP_Management_COMP.ManageByHR.Entity.WorkOrder;
 import com.EMP_Management_COMP.ManageByHR.Entity.WorkOrderStatusHistory;
+import com.EMP_Management_COMP.ManageByHR.Repository.FeedbackRepository;
 import com.EMP_Management_COMP.ManageByHR.Service.WorkOrderService;
 
 @RestController
@@ -29,6 +31,9 @@ public class WorkOrderController {
 
     @Autowired
     private WorkOrderService workOrderService;
+
+    @Autowired
+    private FeedbackRepository feedbackRepo;
 
     @PostMapping
     @PreAuthorize("hasAnyAuthority('CREATE_WORK_ORDER')")
@@ -102,5 +107,17 @@ public class WorkOrderController {
         int minutes = Integer.parseInt(body.get("minutes").toString());
         String note = body.getOrDefault("note", "").toString();
         return ResponseEntity.ok(workOrderService.logTime(id, minutes, note, principal.getName()));
+    }
+
+    @GetMapping("/{id}/feedback")
+    @PreAuthorize("hasAnyAuthority('VIEW_WORK_ORDER')")
+    public ResponseEntity<Feedback> getFeedback(@PathVariable Long id) {
+        return ResponseEntity.ok(feedbackRepo.findByWorkOrderId(id).orElse(null));
+    }
+
+    @GetMapping("/my")
+    @PreAuthorize("hasAnyAuthority('VIEW_WORK_ORDER')")
+    public ResponseEntity<List<WorkOrder>> getMyWorkOrders(Principal principal) {
+        return ResponseEntity.ok(workOrderService.getWorkOrdersByTechnicianEmail(principal.getName()));
     }
 }

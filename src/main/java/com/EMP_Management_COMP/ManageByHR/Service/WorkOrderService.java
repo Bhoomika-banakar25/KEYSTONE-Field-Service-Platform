@@ -73,6 +73,12 @@ public class WorkOrderService {
         return workOrderRepo.findByAssignedToId(technicianId);
     }
 
+    public List<WorkOrder> getWorkOrdersByTechnicianEmail(String email) {
+        UserAuth tech = userAuthRepo.findByUserEmail(email).orElse(null);
+        if (tech == null) return List.of();
+        return workOrderRepo.findByAssignedToId(tech.getId());
+    }
+
     public List<WorkOrder> getWorkOrdersByCustomer(Long customerId) {
         return workOrderRepo.findByCustomerId(customerId);
     }
