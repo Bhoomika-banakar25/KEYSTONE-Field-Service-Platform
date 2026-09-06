@@ -142,10 +142,8 @@ function applyRoleVisibility() {
     document.getElementById('navTechDashboard').style.display = isTechnician ? '' : 'none';
 
     const addWoBtn   = document.getElementById('addWoBtn');
-    const addCustBtn = document.getElementById('addCustBtn');
     const addPartBtn = document.getElementById('addPartBtn');
     if (addWoBtn)   addWoBtn.style.display   = (isManager || isDispatcher) ? '' : 'none';
-    if (addCustBtn) addCustBtn.style.display = (isManager || isDispatcher) ? '' : 'none';
     if (addPartBtn) addPartBtn.style.display = isManager ? '' : 'none';
 }
 
@@ -484,8 +482,13 @@ async function loadPortal() {
     try {
         const res = await apiFetch('/api/portal/my-orders');
         if (!res || !res.ok) {
-            tbody.innerHTML = '<tr><td colspan="6" class="loading">Unable to load. Make sure your email is registered as a customer.</td></tr>';
-            document.getElementById('portalWelcome').innerHTML = '<p style="color:#c62828;font-size:14px">⚠ Your email is not linked to a customer account. Ask your manager to register your company.</p>';
+            tbody.innerHTML = '<tr><td colspan="6" class="loading">No requests yet. Click Raise New Request to submit one.</td></tr>';
+            document.getElementById('portalWelcome').innerHTML = `
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:14px">
+                    <span style="font-size:18px;font-weight:700;color:#1e3a5f">Your Requests:</span>
+                    <span style="font-size:22px;font-weight:800;color:#2d6a9f">0</span>
+                </div>`;
+            await loadPortalSites();
             return;
         }
         const data = await res.json();
