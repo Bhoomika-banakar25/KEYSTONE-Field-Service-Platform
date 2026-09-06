@@ -53,10 +53,15 @@ public class CustomerPortalController {
     @GetMapping("/my-orders")
     @PreAuthorize("hasAnyAuthority('VIEW_OWN_REQUEST')")
     public ResponseEntity<List<WorkOrder>> getMyOrders(Principal principal) {
-        String email = principal.getName();
-        Customer customer = customerRepo.findByEmail(email).orElse(null);
-        if (customer == null) return ResponseEntity.ok(List.of());
-        return ResponseEntity.ok(workOrderService.getWorkOrdersByCustomer(customer.getId()));
+        try {
+            String email = principal.getName();
+            Customer customer = customerRepo.findByEmail(email).orElse(null);
+            if (customer == null) return ResponseEntity.ok(List.of());
+            List<WorkOrder> orders = workOrderService.getWorkOrdersByCustomer(customer.getId());
+            return ResponseEntity.ok(orders);
+        } catch (Exception e) {
+            return ResponseEntity.ok(List.of());
+        }
     }
 
     @PostMapping("/raise-request")
