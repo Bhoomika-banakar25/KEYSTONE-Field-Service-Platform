@@ -513,8 +513,9 @@ async function loadPortal() {
                 ${data.length === 0 ? `<span style="color:#888;font-size:13px">No requests yet. Click + Raise New Request to get started.</span>` : ''}
             </div>`;
 
-        if (!data.length) { tbody.innerHTML = '<tr><td colspan="6" class="loading">No requests yet. Click Raise New Request to submit one.</td></tr>'; return; }
-        tbody.innerHTML = data.map(w => `
+        if (!data.length) { tbody.innerHTML = '<tr><td colspan="6" class="loading">No requests yet. Click Raise New Request to submit one.</td></tr>'; }
+        else {
+            tbody.innerHTML = data.map(w => `
             <tr>
                 <td><strong>${w.code}</strong></td>
                 <td>${w.title}</td>
@@ -526,8 +527,9 @@ async function loadPortal() {
                     ${(w.status === 'COMPLETED' || w.status === 'CLOSED') ? `<button class="btn btn-sm btn-success" style="margin-left:4px" onclick="openFeedbackModal(${w.id})">⭐ Feedback</button>` : ''}
                 </td>
             </tr>`).join('');
+        }
         await loadPortalSites();
-    } catch(e) { tbody.innerHTML = '<tr><td colspan="7" class="loading">Error loading</td></tr>'; }
+    } catch(e) { tbody.innerHTML = '<tr><td colspan="6" class="loading">Error loading</td></tr>'; }
 }
 
 async function loadPortalSites() {
