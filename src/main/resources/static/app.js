@@ -137,7 +137,7 @@ function applyRoleVisibility() {
     document.getElementById('navParts').style.display         = (isManager || isDispatcher) ? '' : 'none';
     document.getElementById('navPortal').style.display        = isCustomer ? '' : 'none';
     document.getElementById('navWorkOrders').style.display    = (isManager || isDispatcher) ? '' : 'none';
-    document.getElementById('navUsers').style.display         = isManager ? '' : 'none';
+    document.getElementById('navUsers').style.display         = (isManager || isDispatcher) ? '' : 'none';
     document.getElementById('navTechDashboard').style.display = isTechnician ? '' : 'none';
 
     const addWoBtn   = document.getElementById('addWoBtn');
@@ -596,6 +596,14 @@ async function deleteStaff(id, name) {
 function showModal(id) {
     document.getElementById(id).classList.add('open');
     if (id === 'addWorkOrderModal') loadCustomersForWO();
+    if (id === 'addUserModal') {
+        const roleSelect = document.getElementById('staffRole');
+        if (userRole === 'DISPATCHER') {
+            roleSelect.innerHTML = '<option value="TECHNICIAN">Technician</option>';
+        } else {
+            roleSelect.innerHTML = '<option value="TECHNICIAN">Technician</option><option value="DISPATCHER">Dispatcher</option>';
+        }
+    }
 }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 

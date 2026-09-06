@@ -52,17 +52,26 @@ public class UserController {
 
     @PostMapping("/staff")
     @PreAuthorize("hasAnyAuthority('CREATE_USER')")
-    public ResponseEntity<?> createStaff(@RequestBody Map<String, Object> body) {
+    public ResponseEntity<?> createStaff(@RequestBody Map<String, Object> body, java.security.Principal principal) {
         String email = body.get("userEmail").toString();
         if (userRepo.findByUserEmail(email).isPresent()) {
             return ResponseEntity.badRequest().body("User with this email already exists");
         }
+        Role roleToCreate = Role.valueOf(body.get("role").toString());
+
+        UserAuth requester = userRepo.findByUserEmail(principal.getName()).orElse(null);
+        if (requester != null && requester.getRole() == Role.DISPATCHER) {
+            if (roleToCreate != Role.TECHNICIAN) {
+                return ResponseEntity.status(403).body("Dispatcher can only create Technician accounts");
+            }
+        }
+
         UserAuth user = new UserAuth();
         user.setUserName(body.get("userName").toString());
         user.setUserEmail(email);
         user.setPassword(passwordEncoder.encode(body.get("password").toString()));
         user.setPhone(body.getOrDefault("phone", "").toString());
-        user.setRole(Role.valueOf(body.get("role").toString()));
+        user.setRole(roleToCreate);
         userRepo.save(user);
         return ResponseEntity.status(201).body(user);
     }
