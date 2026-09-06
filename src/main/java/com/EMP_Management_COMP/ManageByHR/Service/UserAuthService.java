@@ -13,7 +13,10 @@ import com.EMP_Management_COMP.ManageByHR.DTO.ForgotPasswordDTO;
 import com.EMP_Management_COMP.ManageByHR.DTO.LoginRequestDTO;
 import com.EMP_Management_COMP.ManageByHR.DTO.RegisterRequestDTO;
 import com.EMP_Management_COMP.ManageByHR.DTO.ResetPasswordDTO;
+import com.EMP_Management_COMP.ManageByHR.ENUM.Role;
+import com.EMP_Management_COMP.ManageByHR.Entity.Customer;
 import com.EMP_Management_COMP.ManageByHR.Entity.UserAuth;
+import com.EMP_Management_COMP.ManageByHR.Repository.CustomerRepository;
 import com.EMP_Management_COMP.ManageByHR.Repository.UserAuthRepository;
 import com.EMP_Management_COMP.ManageByHR.Security.EmailService;
 import com.EMP_Management_COMP.ManageByHR.Security.JWTUtil;
@@ -26,6 +29,9 @@ public class UserAuthService {
 
     @Autowired
     private UserAuthRepository userAuthRepo;
+
+    @Autowired
+    private CustomerRepository customerRepo;
 
     @Autowired
     private JWTUtil jwtUtil;
@@ -55,6 +61,21 @@ public class UserAuthService {
         user.setRole(register.role);
 
         userAuthRepo.save(user);
+
+        if (register.role == Role.CUSTOMER) {
+            boolean alreadyExists = customerRepo.findByEmail(register.userEmail).isPresent();
+            if (!alreadyExists) {
+                Customer customer = new Customer();
+                customer.setCompanyName(register.userName);
+                customer.setContactPerson(register.userName);
+                customer.setEmail(register.userEmail);
+                customer.setPhone(register.phone != null ? register.phone : "");
+                customer.setAddress("To be updated");
+                customer.setActive(true);
+                customer.setCreatedAt(java.time.LocalDateTime.now());
+                customerRepo.save(customer);
+            }
+        }
 
         String token = jwtUtil.generateToken(user);
         return new AuthResponseDTO(token, "Registration Successful");
