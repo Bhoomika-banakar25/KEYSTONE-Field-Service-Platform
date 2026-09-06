@@ -3,6 +3,7 @@ package com.EMP_Management_COMP.ManageByHR.Entity;
 import java.time.LocalDateTime;
 
 import com.EMP_Management_COMP.ManageByHR.ENUM.WorkOrderStatus;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -26,6 +27,7 @@ public class WorkOrderStatusHistory {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "work_order_id", nullable = false)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private WorkOrder workOrder;
 
     @Enumerated(EnumType.STRING)
