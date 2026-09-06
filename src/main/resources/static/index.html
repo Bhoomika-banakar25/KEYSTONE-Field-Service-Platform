@@ -122,7 +122,7 @@
             <a href="#" class="nav-item" id="navCustomers" onclick="showSection('customers',this)">Customers</a>
             <a href="#" class="nav-item" id="navWorkOrders" onclick="showSection('workorders',this)">Work Orders</a>
             <a href="#" class="nav-item" id="navParts" onclick="showSection('parts',this)">Parts</a>
-            <a href="#" class="nav-item" id="navUsers" onclick="showSection('users',this)" style="display:none">Users</a>
+            <a href="#" class="nav-item" id="navUsers" onclick="showSection('users',this)" style="display:none">Staff</a>
             <a href="#" class="nav-item" id="navPortal" onclick="showSection('portal',this)" style="display:none">My Requests</a>
             <a href="#" class="nav-item" id="navTechDashboard" onclick="showSection('tech-dashboard',this)" style="display:none">My Dashboard</a>
         </div>
@@ -190,7 +190,7 @@
     
     <div id="section-users" class="section">
         <div class="section-header">
-            <h2>User Management</h2>
+            <h2>Staff Management</h2>
             <button class="btn btn-primary" onclick="showModal('addUserModal')">+ Add Staff</button>
         </div>
         <div class="table-container">
@@ -399,6 +399,24 @@
         <div class="modal-footer">
             <button class="btn btn-outline" onclick="closeModal('feedbackModal')">Cancel</button>
             <button class="btn btn-primary" onclick="submitFeedback()">Submit Feedback</button>
+        </div>
+    </div>
+</div>
+
+<div id="assignTechModal" class="modal">
+    <div class="modal-box" style="max-width:440px">
+        <div class="modal-header"><h3>👷 Assign Technician</h3><span onclick="closeModal('assignTechModal')" class="close-btn">✕</span></div>
+        <input type="hidden" id="assignModalWoId">
+        <div class="form-group">
+            <label>Select Technician</label>
+            <select id="assignModalSelect" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px">
+                <option value="">Loading...</option>
+            </select>
+        </div>
+        <div id="assignModalError" class="error-msg" style="display:none"></div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeModal('assignTechModal')">Cancel</button>
+            <button class="btn btn-warning" onclick="confirmAssign()">Assign</button>
         </div>
     </div>
 </div>

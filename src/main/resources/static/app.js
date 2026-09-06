@@ -233,18 +233,7 @@ async function viewSites(customerId, companyName) {
             <table class="data-table">
                 <thead><tr><th>ID</th><th>Name</th><th>City</th><th>Address</th></tr></thead>
                 <tbody>${sites.map(s => `<tr><td>${s.id}</td><td>${s.name}</td><td>${s.city||'-'}</td><td>${s.address}</td></tr>`).join('')}</tbody>
-            </table>` : '<p style="color:#888;margin-bottom:16px">No sites yet</p>'}
-            ${canEdit ? `
-            <div style="margin-top:20px;padding-top:16px;border-top:1px solid #eee">
-                <h4 style="margin-bottom:12px;color:#1e3a5f">Add New Site</h4>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-                    <input id="sName"  placeholder="Site name *"   style="padding:9px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px">
-                    <input id="sCity"  placeholder="City"          style="padding:9px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px">
-                    <input id="sAddr"  placeholder="Address *"     style="padding:9px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px">
-                    <input id="sPhone" placeholder="Contact phone" style="padding:9px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px">
-                </div>
-                <button class="btn btn-primary btn-sm" style="margin-top:12px" onclick="addSite(${customerId})">Add Site</button>
-            </div>` : ''}
+            </table>` : '<p style="color:#888;margin-bottom:16px">No sites registered yet</p>'}
         </div>`;
     showModal('woDetailModal');
 }
@@ -276,7 +265,10 @@ async function loadWorkOrders() {
                 </td>
                 <td>${w.customer?.companyName || '-'}</td>
                 <td style="font-size:12px">${w.slaDueAt ? formatDate(w.slaDueAt) : '-'}</td>
-                <td><button class="btn btn-sm btn-primary" onclick="viewWorkOrder(${w.id})">View</button></td>
+                <td style="display:flex;gap:6px;flex-wrap:wrap">
+                    <button class="btn btn-sm btn-primary" onclick="viewWorkOrder(${w.id})">View</button>
+                    ${(['MANAGER','ADMIN','DISPATCHER'].includes(userRole) && w.status !== 'CLOSED' && w.status !== 'CANCELLED') ? `<button class="btn btn-sm btn-warning" onclick="openAssignModal(${w.id})">👷 Assign</button>` : ''}
+                </td>
             </tr>`).join('');
     } catch(e) { tbody.innerHTML = '<tr><td colspan="7" class="loading">Error loading</td></tr>'; }
 }
@@ -383,6 +375,26 @@ async function loadTechnicians() {
     if (!res || !res.ok) { sel.innerHTML = '<option value="">No technicians</option>'; return; }
     const techs = await res.json();
     sel.innerHTML = '<option value="">Select technician...</option>' + techs.map(t => `<option value="${t.id}">${t.userName} (${t.userEmail})</option>`).join('');
+}
+
+async function openAssignModal(workOrderId) {
+    document.getElementById('assignModalWoId').value = workOrderId;
+    document.getElementById('assignModalSelect').innerHTML = '<option value="">Loading...</option>';
+    document.getElementById('assignModalError').style.display = 'none';
+    showModal('assignTechModal');
+    const res = await apiFetch('/api/users/technicians');
+    if (!res || !res.ok) { document.getElementById('assignModalSelect').innerHTML = '<option value="">No technicians found</option>'; return; }
+    const techs = await res.json();
+    document.getElementById('assignModalSelect').innerHTML = '<option value="">Select technician...</option>' + techs.map(t => `<option value="${t.id}">${t.userName} — ${t.userEmail}</option>`).join('');
+}
+
+async function confirmAssign() {
+    const workOrderId = document.getElementById('assignModalWoId').value;
+    const techId = document.getElementById('assignModalSelect').value;
+    if (!techId) { showError('assignModalError', 'Please select a technician'); return; }
+    const res = await apiFetch(`/api/work-orders/${workOrderId}/assign`, { method: 'POST', body: JSON.stringify({ technicianId: techId }) });
+    if (res?.ok) { closeModal('assignTechModal'); loadWorkOrders(); showToast('Technician assigned!'); }
+    else { showError('assignModalError', 'Failed to assign. Try again.'); }
 }
 
 async function loadPartsDropdown() {
