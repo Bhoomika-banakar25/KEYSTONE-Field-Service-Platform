@@ -43,7 +43,7 @@ public class RoleBasedPermissions {
         )));
 
         permission.put(Role.CUSTOMER, new HashSet<>(Arrays.asList(
-            Permissions.RAISE_REQUEST, Permissions.VIEW_OWN_REQUEST
+            Permissions.RAISE_REQUEST, Permissions.VIEW_OWN_REQUEST, Permissions.VIEW_SITE
         )));
 
         permission.put(Role.ADMIN, new HashSet<>(Arrays.asList(Permissions.values())));
