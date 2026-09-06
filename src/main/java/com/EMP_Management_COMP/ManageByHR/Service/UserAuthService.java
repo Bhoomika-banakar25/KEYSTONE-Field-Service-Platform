@@ -15,8 +15,10 @@ import com.EMP_Management_COMP.ManageByHR.DTO.RegisterRequestDTO;
 import com.EMP_Management_COMP.ManageByHR.DTO.ResetPasswordDTO;
 import com.EMP_Management_COMP.ManageByHR.ENUM.Role;
 import com.EMP_Management_COMP.ManageByHR.Entity.Customer;
+import com.EMP_Management_COMP.ManageByHR.Entity.Site;
 import com.EMP_Management_COMP.ManageByHR.Entity.UserAuth;
 import com.EMP_Management_COMP.ManageByHR.Repository.CustomerRepository;
+import com.EMP_Management_COMP.ManageByHR.Repository.SiteRepository;
 import com.EMP_Management_COMP.ManageByHR.Repository.UserAuthRepository;
 import com.EMP_Management_COMP.ManageByHR.Security.EmailService;
 import com.EMP_Management_COMP.ManageByHR.Security.JWTUtil;
@@ -32,6 +34,9 @@ public class UserAuthService {
 
     @Autowired
     private CustomerRepository customerRepo;
+
+    @Autowired
+    private SiteRepository siteRepo;
 
     @Autowired
     private JWTUtil jwtUtil;
@@ -65,15 +70,27 @@ public class UserAuthService {
         if (register.role == Role.CUSTOMER) {
             boolean alreadyExists = customerRepo.findByEmail(register.userEmail).isPresent();
             if (!alreadyExists) {
+                String locationStr = (register.location != null && !register.location.isBlank())
+                        ? register.location : "Address not provided";
+
                 Customer customer = new Customer();
                 customer.setCompanyName(register.userName);
                 customer.setContactPerson(register.userName);
                 customer.setEmail(register.userEmail);
                 customer.setPhone(register.phone != null ? register.phone : "");
-                customer.setAddress("To be updated");
+                customer.setAddress(locationStr);
                 customer.setActive(true);
                 customer.setCreatedAt(java.time.LocalDateTime.now());
-                customerRepo.save(customer);
+                Customer savedCustomer = customerRepo.save(customer);
+
+                Site site = new Site();
+                site.setName("Main Location");
+                site.setAddress(locationStr);
+                site.setContactPhone(register.phone != null ? register.phone : "");
+                site.setActive(true);
+                site.setCreatedAt(java.time.LocalDateTime.now());
+                site.setCustomer(savedCustomer);
+                siteRepo.save(site);
             }
         }
 

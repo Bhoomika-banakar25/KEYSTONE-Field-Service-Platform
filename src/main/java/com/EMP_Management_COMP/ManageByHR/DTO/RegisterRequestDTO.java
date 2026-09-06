@@ -9,15 +9,17 @@ public class RegisterRequestDTO {
     public String phone;
     public String password;
     public Role role;
+    public String location;
 
     public RegisterRequestDTO() {}
 
-    public RegisterRequestDTO(String userName, String userEmail, String phone, String password, Role role) {
+    public RegisterRequestDTO(String userName, String userEmail, String phone, String password, Role role, String location) {
         this.userName = userName;
         this.userEmail = userEmail;
         this.phone = phone;
         this.password = password;
         this.role = role;
+        this.location = location;
     }
 
     public String getUserName() { return userName; }
@@ -34,4 +36,7 @@ public class RegisterRequestDTO {
 
     public Role getRole() { return role; }
     public void setRole(Role role) { this.role = role; }
+
+    public String getLocation() { return location; }
+    public void setLocation(String location) { this.location = location; }
 }

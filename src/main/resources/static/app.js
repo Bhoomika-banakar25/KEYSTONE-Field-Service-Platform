@@ -80,10 +80,11 @@ async function login() {
 
 async function register() {
     const body = {
-        userName: document.getElementById('regName').value,
+        userName:  document.getElementById('regName').value,
         userEmail: document.getElementById('regEmail').value,
         password:  document.getElementById('regPassword').value,
         phone:     document.getElementById('regPhone').value,
+        location:  document.getElementById('regLocation').value,
         role:      document.getElementById('regRole').value
     };
     if (!body.userName || !body.userEmail || !body.password) { showError('registerError', 'Please fill all required fields'); return; }
