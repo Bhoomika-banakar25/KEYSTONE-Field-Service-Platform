@@ -63,11 +63,13 @@ public class UserAuthService {
         user.setUserEmail(register.userEmail);
         user.setPassword(passwordEncoder.encode(register.password));
         user.setPhone(register.phone);
-        user.setRole(register.role);
+
+        Role assignedRole = register.role != null ? register.role : Role.CUSTOMER;
+        user.setRole(assignedRole);
 
         userAuthRepo.save(user);
 
-        if (register.role == Role.CUSTOMER) {
+        if (assignedRole == Role.CUSTOMER) {
             boolean alreadyExists = customerRepo.findByEmail(register.userEmail).isPresent();
             if (!alreadyExists) {
                 String locationStr = (register.location != null && !register.location.isBlank())
