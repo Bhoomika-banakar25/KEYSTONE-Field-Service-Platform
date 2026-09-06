@@ -271,7 +271,10 @@ async function loadWorkOrders() {
                 <td><strong>${w.code}</strong></td>
                 <td>${w.title}</td>
                 <td><span class="badge badge-${w.priority?.toLowerCase()}">${w.priority}</span></td>
-                <td><span class="badge badge-${statusClass(w.status)}">${formatStatus(w.status)}</span></td>
+                <td>
+                    <span class="badge badge-${statusClass(w.status)}">${formatStatus(w.status)}</span>
+                    ${w.assignedTo ? `<div style="font-size:11px;color:#888;margin-top:3px">👷 ${w.assignedTo.userName}</div>` : ''}
+                </td>
                 <td>${w.customer?.companyName || '-'}</td>
                 <td style="font-size:12px">${w.slaDueAt ? formatDate(w.slaDueAt) : '-'}</td>
                 <td><button class="btn btn-sm btn-primary" onclick="viewWorkOrder(${w.id})">View</button></td>
@@ -480,19 +483,42 @@ async function loadPortal() {
     try {
         const res = await apiFetch('/api/portal/my-orders');
         if (!res || !res.ok) {
-            tbody.innerHTML = '<tr><td colspan="7" class="loading">Unable to load. Make sure your email is registered as a customer.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" class="loading">Unable to load. Make sure your email is registered as a customer.</td></tr>';
             document.getElementById('portalWelcome').innerHTML = '<p style="color:#c62828;font-size:14px">⚠ Your email is not linked to a customer account. Ask your manager to register your company.</p>';
             return;
         }
         const data = await res.json();
-        document.getElementById('portalWelcome').innerHTML = `<p style="color:#388e3c;font-size:14px">✓ Welcome! You have <strong>${data.length}</strong> service request(s).</p>`;
-        if (!data.length) { tbody.innerHTML = '<tr><td colspan="7" class="loading">No requests yet. Click Raise New Request to submit one.</td></tr>'; return; }
+
+        const counts = { new: 0, assigned: 0, accepted: 0, completed: 0, closed: 0 };
+        data.forEach(w => {
+            if (w.status === 'NEW')         counts.new++;
+            else if (w.status === 'ASSIGNED') counts.assigned++;
+            else if (w.status === 'IN_PROGRESS') counts.accepted++;
+            else if (w.status === 'COMPLETED')   counts.completed++;
+            else if (w.status === 'CLOSED')      counts.closed++;
+        });
+
+        document.getElementById('portalWelcome').innerHTML = `
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:14px">
+                <span style="font-size:18px;font-weight:700;color:#1e3a5f">Your Requests:</span>
+                <span style="font-size:22px;font-weight:800;color:#2d6a9f">${data.length}</span>
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+                ${counts.new        ? `<span style="background:#e3f2fd;color:#1565c0;padding:5px 14px;border-radius:20px;font-size:13px;font-weight:600">🕐 Pending: ${counts.new}</span>` : ''}
+                ${counts.assigned   ? `<span style="background:#fff3e0;color:#e65100;padding:5px 14px;border-radius:20px;font-size:13px;font-weight:600">👷 Technician Assigned: ${counts.assigned}</span>` : ''}
+                ${counts.accepted   ? `<span style="background:#f3e5f5;color:#6a1b9a;padding:5px 14px;border-radius:20px;font-size:13px;font-weight:600">🔧 Work in Progress: ${counts.accepted}</span>` : ''}
+                ${counts.completed  ? `<span style="background:#e8f5e9;color:#2e7d32;padding:5px 14px;border-radius:20px;font-size:13px;font-weight:600">✅ Completed: ${counts.completed}</span>` : ''}
+                ${counts.closed     ? `<span style="background:#f5f5f5;color:#555;padding:5px 14px;border-radius:20px;font-size:13px;font-weight:600">🔒 Closed: ${counts.closed}</span>` : ''}
+                ${data.length === 0 ? `<span style="color:#888;font-size:13px">No requests yet. Click + Raise New Request to get started.</span>` : ''}
+            </div>`;
+
+        if (!data.length) { tbody.innerHTML = '<tr><td colspan="6" class="loading">No requests yet. Click Raise New Request to submit one.</td></tr>'; return; }
         tbody.innerHTML = data.map(w => `
             <tr>
                 <td><strong>${w.code}</strong></td>
                 <td>${w.title}</td>
                 <td><span class="badge badge-${w.priority?.toLowerCase()}">${w.priority}</span></td>
-                <td><span class="badge badge-${statusClass(w.status)}">${formatStatus(w.status)}</span></td>
+                <td><span class="badge badge-${statusClass(w.status)}">${customerStatusLabel(w.status)}</span></td>
                 <td>${w.site?.name || '-'}</td>
                 <td>
                     <button class="btn btn-sm btn-outline" onclick="viewWorkOrder(${w.id})">View</button>
@@ -633,7 +659,9 @@ async function loadTechDashboard() {
                 <td><strong>${w.code}</strong></td>
                 <td>${w.title}</td>
                 <td><span class="badge badge-${w.priority?.toLowerCase()}">${w.priority}</span></td>
-                <td><span class="badge badge-${statusClass(w.status)}">${formatStatus(w.status)}</span></td>
+                <td>
+                    <span class="badge badge-${statusClass(w.status)}">${techStatusLabel(w.status)}</span>
+                </td>
                 <td>${w.customer?.companyName || '-'}</td>
                 <td><button class="btn btn-sm btn-primary" onclick="viewWorkOrder(${w.id})">View</button></td>
             </tr>`).join('');
@@ -717,5 +745,7 @@ function showSuccess(id, msg) { const el = document.getElementById(id); if(el){e
 function clearFields(ids) { ids.forEach(id => { const el = document.getElementById(id); if(el) el.value=''; }); }
 function statusClass(s) { return { NEW:'new', ASSIGNED:'assigned', IN_PROGRESS:'inprogress', ON_HOLD:'onhold', COMPLETED:'completed', CLOSED:'closed', CANCELLED:'cancelled' }[s] || 'new'; }
 function formatStatus(s) { return { NEW:'New', ASSIGNED:'Assigned', IN_PROGRESS:'In Progress', ON_HOLD:'On Hold', COMPLETED:'Completed', CLOSED:'Closed', CANCELLED:'Cancelled' }[s] || s; }
+function customerStatusLabel(s) { return { NEW:'Pending', ASSIGNED:'Technician Assigned', IN_PROGRESS:'Work in Progress', ON_HOLD:'On Hold', COMPLETED:'Completed', CLOSED:'Closed', CANCELLED:'Cancelled' }[s] || s; }
+function techStatusLabel(s) { return { NEW:'Pending', ASSIGNED:'Assigned to Me', IN_PROGRESS:'Accepted — In Progress', ON_HOLD:'On Hold', COMPLETED:'Completed', CLOSED:'Closed', CANCELLED:'Cancelled' }[s] || s; }
 function formatDate(d) { if (!d) return '-'; return new Date(d).toLocaleString('en-IN', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }); }
 function isSlaWarning(d) { if (!d) return false; return new Date(d) < new Date(Date.now() + 2 * 60 * 60 * 1000); }
