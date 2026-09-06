@@ -323,8 +323,9 @@
             </select>
         </div>
         <div class="form-group">
-            <label>Site</label>
-            <select id="reqSite"><option value="">Loading your sites...</option></select>
+            <label>Site / Location</label>
+            <select id="reqSite" onchange="toggleManualAddress(this)"><option value="">Loading your sites...</option></select>
+            <input type="text" id="reqManualAddress" placeholder="Enter your address (e.g. 123 MG Road, Bangalore)" style="display:none;margin-top:8px">
         </div>
         <div class="form-group">
             <label>Photo of Problem <span style="color:#aaa;font-size:12px">(optional)</span></label>

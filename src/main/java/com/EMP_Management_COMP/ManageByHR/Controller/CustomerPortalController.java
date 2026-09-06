@@ -19,9 +19,11 @@ import org.springframework.web.bind.annotation.RestController;
 import com.EMP_Management_COMP.ManageByHR.ENUM.Priority;
 import com.EMP_Management_COMP.ManageByHR.Entity.Customer;
 import com.EMP_Management_COMP.ManageByHR.Entity.Feedback;
+import com.EMP_Management_COMP.ManageByHR.Entity.Site;
 import com.EMP_Management_COMP.ManageByHR.Entity.WorkOrder;
 import com.EMP_Management_COMP.ManageByHR.Repository.CustomerRepository;
 import com.EMP_Management_COMP.ManageByHR.Repository.FeedbackRepository;
+import com.EMP_Management_COMP.ManageByHR.Repository.SiteRepository;
 import com.EMP_Management_COMP.ManageByHR.Repository.UserAuthRepository;
 import com.EMP_Management_COMP.ManageByHR.Repository.WorkOrderRepository;
 import com.EMP_Management_COMP.ManageByHR.Service.WorkOrderService;
@@ -44,6 +46,9 @@ public class CustomerPortalController {
 
     @Autowired
     private WorkOrderRepository workOrderRepo;
+
+    @Autowired
+    private SiteRepository siteRepo;
 
     @GetMapping("/my-orders")
     @PreAuthorize("hasAnyAuthority('VIEW_OWN_REQUEST')")
@@ -112,5 +117,26 @@ public class CustomerPortalController {
     @PreAuthorize("hasAnyAuthority('VIEW_OWN_REQUEST', 'VIEW_WORK_ORDER')")
     public ResponseEntity<?> getFeedback(@PathVariable Long workOrderId) {
         return ResponseEntity.ok(feedbackRepo.findByWorkOrderId(workOrderId).orElse(null));
+    }
+
+    @PostMapping("/add-site")
+    @PreAuthorize("hasAnyAuthority('VIEW_OWN_REQUEST')")
+    public ResponseEntity<Site> addSite(@RequestBody Map<String, Object> body, Principal principal) {
+        String email = principal.getName();
+        Customer customer = customerRepo.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Customer not found"));
+
+        Site site = new Site();
+        site.setName(body.getOrDefault("name", "Main Location").toString());
+        site.setAddress(body.get("address").toString());
+        site.setContactPhone(customer.getPhone());
+        site.setActive(true);
+        site.setCreatedAt(LocalDateTime.now());
+        site.setCustomer(customer);
+
+        customer.setAddress(body.get("address").toString());
+        customerRepo.save(customer);
+
+        return ResponseEntity.status(201).body(siteRepo.save(site));
     }
 }

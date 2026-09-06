@@ -539,9 +539,24 @@ async function loadPortalSites() {
     if (!sitesRes || !sitesRes.ok) return;
     const sites = await sitesRes.json();
     const sel = document.getElementById('reqSite');
+    const manualInput = document.getElementById('reqManualAddress');
     if (sel) {
-        sel.innerHTML = sites.length ? '<option value="">Select site...</option>' + sites.map(s => `<option value="${s.id}">${s.name}</option>`).join('') : '<option value="">No sites available</option>';
+        if (sites.length) {
+            sel.innerHTML = '<option value="">Select site...</option>' + sites.map(s => `<option value="${s.id}">${s.name} — ${s.address}</option>`).join('');
+            sel.style.display = '';
+            if (manualInput) manualInput.style.display = 'none';
+        } else {
+            sel.innerHTML = '<option value="new">+ Enter address manually</option>';
+            sel.style.display = '';
+            if (manualInput) manualInput.style.display = 'block';
+        }
     }
+}
+
+function toggleManualAddress(sel) {
+    const manualInput = document.getElementById('reqManualAddress');
+    if (!manualInput) return;
+    manualInput.style.display = (sel.value === 'new' || sel.value === '') ? 'block' : 'none';
 }
 
 async function raiseRequest() {
@@ -550,14 +565,29 @@ async function raiseRequest() {
     if (photoInput && photoInput.files && photoInput.files[0]) {
         problemPhoto = await toBase64(photoInput.files[0]);
     }
+
+    let siteId = document.getElementById('reqSite').value;
+    const manualAddress = document.getElementById('reqManualAddress')?.value?.trim();
+
+    if (siteId === 'new' || siteId === '') {
+        if (!manualAddress) { showError('reqError', 'Please enter your address'); return; }
+        const siteRes = await apiFetch('/api/portal/add-site', {
+            method: 'POST',
+            body: JSON.stringify({ name: 'Main Location', address: manualAddress })
+        });
+        if (!siteRes || !siteRes.ok) { showError('reqError', 'Failed to save your address. Try again.'); return; }
+        const newSite = await siteRes.json();
+        siteId = newSite.id;
+    }
+
     const body = {
         title:        document.getElementById('reqTitle').value,
         description:  document.getElementById('reqDesc').value,
         priority:     document.getElementById('reqPriority').value,
-        siteId:       document.getElementById('reqSite').value,
+        siteId:       siteId,
         problemPhoto: problemPhoto
     };
-    if (!body.title || !body.siteId) { showError('reqError', 'Title and site are required'); return; }
+    if (!body.title || !siteId) { showError('reqError', 'Title and site are required'); return; }
     const res = await apiFetch('/api/portal/raise-request', { method: 'POST', body: JSON.stringify(body) });
     if (res?.ok) {
         closeModal('raiseRequestModal');
