@@ -3,64 +3,100 @@ let token = localStorage.getItem('token');
 let currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
 let userRole = localStorage.getItem('userRole') || '';
 
-// ── Init ──────────────────────────────────────────────────────────────────
 window.onload = () => {
     if (token && currentUser) {
         showDashboard();
     } else {
-        showPage('loginPage');
+        showPage('homePage');
     }
 };
 
-// ── Auth ──────────────────────────────────────────────────────────────────
+function goToLogin(role) {
+    const colors = { MANAGER: '#1a0050', DISPATCHER: '#0a0060', TECHNICIAN: '#c1007a', CUSTOMER: '#006080' };
+    const labels = { MANAGER: '👔 Manager Login', DISPATCHER: '📋 Dispatcher Login', TECHNICIAN: '🔧 Technician Login', CUSTOMER: '🏢 Customer Login' };
+    const descs  = {
+        MANAGER:    'Access dashboard, work orders, customers, reports & full control',
+        DISPATCHER: 'Create & assign work orders, manage customers and sites',
+        TECHNICIAN: 'View assigned jobs, start work, log parts & time',
+        CUSTOMER:   'Raise service requests and track your work orders'
+    };
+    document.getElementById('loginRoleTitle').textContent = labels[role] || 'Login';
+    document.getElementById('loginRoleBadge').textContent = role;
+    document.getElementById('loginRoleBadge').style.background = colors[role] || '#333';
+    document.getElementById('loginRoleBadge').style.color = 'white';
+    document.getElementById('loginRoleDesc').textContent = descs[role] || '';
+    document.getElementById('expectedRole').value = role;
+    document.getElementById('loginError').style.display = 'none';
+    document.getElementById('registerHint').style.display = role === 'CUSTOMER' ? 'block' : 'none';
+
+    const container = document.querySelector('.home-container');
+    const panel = document.getElementById('splitLoginPanel');
+    container.classList.add('split-mode');
+    panel.classList.add('active');
+    document.getElementById('loginEmail').value = '';
+    document.getElementById('loginPassword').value = '';
+    document.getElementById('loginEmail').focus();
+}
+
+function closeSplit() {
+    const container = document.querySelector('.home-container');
+    const panel = document.getElementById('splitLoginPanel');
+    container.classList.remove('split-mode');
+    panel.classList.remove('active');
+    document.getElementById('loginEmail').value = '';
+    document.getElementById('loginPassword').value = '';
+    document.getElementById('loginError').style.display = 'none';
+}
+
 async function login() {
     const email = document.getElementById('loginEmail').value.trim();
     const pass  = document.getElementById('loginPassword').value;
+    const expectedRole = document.getElementById('expectedRole').value;
     if (!email || !pass) { showError('loginError', 'Please fill all fields'); return; }
-
     try {
         const res = await fetch(`${API}/api/user_auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ userEmail: email, password: pass })
         });
         if (!res.ok) { showError('loginError', 'Invalid email or password'); return; }
         const t = await res.text();
+        const payload = JSON.parse(atob(t.split('.')[1]));
+        const actualRole = payload.Role || '';
+
+        if (expectedRole && actualRole !== expectedRole) {
+            showError('loginError', `Access denied. This is ${expectedRole} Login. Your account is ${actualRole}.`);
+            return;
+        }
+
         token = t;
         localStorage.setItem('token', token);
-
-        // Decode JWT to get role
-        const payload = JSON.parse(atob(t.split('.')[1]));
-        userRole = payload.Role || '';
+        userRole = actualRole;
         localStorage.setItem('userRole', userRole);
         currentUser = { email };
         localStorage.setItem('currentUser', JSON.stringify(currentUser));
-
         showDashboard();
     } catch(e) { showError('loginError', 'Cannot connect to server'); }
 }
 
 async function register() {
     const body = {
-        userName: document.getElementById('regName').value,
+        userName:  document.getElementById('regName').value,
         userEmail: document.getElementById('regEmail').value,
         password:  document.getElementById('regPassword').value,
         phone:     document.getElementById('regPhone').value,
+        location:  document.getElementById('regLocation').value,
         role:      document.getElementById('regRole').value
     };
-    if (!body.userName || !body.userEmail || !body.password) {
-        showError('registerError', 'Please fill all required fields'); return;
-    }
+    if (!body.userName || !body.userEmail || !body.password) { showError('registerError', 'Please fill all required fields'); return; }
     try {
         const res = await fetch(`${API}/api/user_auth/register`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
         });
         const data = await res.json();
         if (!res.ok) { showError('registerError', data.message || 'Registration failed'); return; }
         document.getElementById('registerError').style.display = 'none';
         showSuccess('registerSuccess', 'Registered successfully! Please login.');
-        setTimeout(showLogin, 1500);
+        setTimeout(() => showPage('homePage'), 1500);
     } catch(e) { showError('registerError', 'Cannot connect to server'); }
 }
 
@@ -68,46 +104,47 @@ function logout() {
     fetch(`${API}/api/user_auth/logout`, { method: 'POST', headers: authHeader() });
     token = null; currentUser = null; userRole = '';
     localStorage.clear();
-    showPage('loginPage');
+    showPage('homePage');
 }
 
-// ── Navigation ────────────────────────────────────────────────────────────
 function showPage(id) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.getElementById(id).classList.add('active');
 }
-function showLogin()    { showPage('loginPage'); }
+function showLogin() { showPage('loginPage'); }
 function showRegister() { showPage('registerPage'); }
 
 function showDashboard() {
     showPage('dashboardPage');
     document.getElementById('userInfo').textContent = `${currentUser?.email} (${userRole})`;
     applyRoleVisibility();
-    showSection('dashboard');
+    if (userRole === 'CUSTOMER') {
+        showSection('portal', document.getElementById('navPortal'));
+    } else if (userRole === 'TECHNICIAN') {
+        showSection('tech-dashboard', document.getElementById('navTechDashboard'));
+    } else {
+        showSection('dashboard', null);
+    }
 }
 
-// Hide/show nav items based on role
 function applyRoleVisibility() {
-    const isManager    = ['MANAGER','ADMIN'].includes(userRole);
-    const isDispatcher = ['DISPATCHER'].includes(userRole);
-    const isTechnician = ['TECHNICIAN','EMPLOYEE'].includes(userRole);
-    const isCustomer   = ['CUSTOMER'].includes(userRole);
+    const isManager    = ['MANAGER', 'ADMIN'].includes(userRole);
+    const isDispatcher = userRole === 'DISPATCHER';
+    const isTechnician = userRole === 'TECHNICIAN';
+    const isCustomer   = userRole === 'CUSTOMER';
 
-    // Nav items
-    const nav = {
-        customers:  isManager || isDispatcher,
-        parts:      isManager || isDispatcher,
-        workorders: true // everyone sees work orders
-    };
-    document.getElementById('navCustomers').style.display  = nav.customers  ? '' : 'none';
-    document.getElementById('navParts').style.display      = nav.parts      ? '' : 'none';
+    document.getElementById('navDashboard').style.display     = (isManager || isDispatcher) ? '' : 'none';
+    document.getElementById('navCustomers').style.display     = (isManager || isDispatcher) ? '' : 'none';
+    document.getElementById('navParts').style.display         = (isManager || isDispatcher) ? '' : 'none';
+    document.getElementById('navPortal').style.display        = isCustomer ? '' : 'none';
+    document.getElementById('navWorkOrders').style.display    = (isManager || isDispatcher) ? '' : 'none';
+    document.getElementById('navUsers').style.display         = isManager ? '' : 'none';
+    document.getElementById('navDispatchers').style.display   = isManager ? '' : 'none';
+    document.getElementById('navTechDashboard').style.display = isTechnician ? '' : 'none';
 
-    // Add buttons
-    const addWoBtn = document.getElementById('addWoBtn');
-    if (addWoBtn) addWoBtn.style.display = (isManager || isDispatcher) ? '' : 'none';
-    const addCustBtn = document.getElementById('addCustBtn');
-    if (addCustBtn) addCustBtn.style.display = (isManager || isDispatcher) ? '' : 'none';
+    const addWoBtn   = document.getElementById('addWoBtn');
     const addPartBtn = document.getElementById('addPartBtn');
+    if (addWoBtn)   addWoBtn.style.display   = (isManager || isDispatcher) ? '' : 'none';
     if (addPartBtn) addPartBtn.style.display = isManager ? '' : 'none';
 }
 
@@ -117,13 +154,16 @@ function showSection(name, el) {
     document.getElementById('section-' + name).classList.add('active');
     if (el) el.classList.add('active');
 
-    if (name === 'dashboard')  loadDashboard();
-    if (name === 'customers')  loadCustomers();
-    if (name === 'workorders') loadWorkOrders();
-    if (name === 'parts')      loadParts();
+    if (name === 'dashboard')      loadDashboard();
+    if (name === 'customers')      loadCustomers();
+    if (name === 'workorders')     loadWorkOrders();
+    if (name === 'parts')          loadParts();
+    if (name === 'portal')         loadPortal();
+    if (name === 'users')          loadUsers();
+    if (name === 'dispatchers')    loadDispatchers();
+    if (name === 'tech-dashboard') loadTechDashboard();
 }
 
-// ── API Helper ────────────────────────────────────────────────────────────
 function authHeader() {
     return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token };
 }
@@ -135,22 +175,19 @@ async function apiFetch(url, options = {}) {
     return res;
 }
 
-// ── Dashboard ─────────────────────────────────────────────────────────────
 async function loadDashboard() {
     try {
         const res = await apiFetch('/api/reports/summary');
         if (!res || !res.ok) return;
         const data = await res.json();
-        document.getElementById('statTotal').textContent      = data.total       || 0;
-        document.getElementById('statNew').textContent        = data.new         || 0;
-        document.getElementById('statInProgress').textContent = data.inProgress  || 0;
-        document.getElementById('statCompleted').textContent  = data.completed   || 0;
-        document.getElementById('statClosed').textContent     = data.closed      || 0;
-        document.getElementById('statBreached').textContent   = data.slaBreached || 0;
-    } catch(e) { /* no dashboard permission */ }
+        document.getElementById('statTotal').textContent      = data.total      || 0;
+        document.getElementById('statNew').textContent        = data.new        || 0;
+        document.getElementById('statInProgress').textContent = data.inProgress || 0;
+        document.getElementById('statCompleted').textContent  = data.completed  || 0;
+        document.getElementById('statClosed').textContent     = data.closed     || 0;
+    } catch(e) {}
 }
 
-// ── Customers ─────────────────────────────────────────────────────────────
 async function loadCustomers() {
     const tbody = document.getElementById('customersTable');
     tbody.innerHTML = '<tr><td colspan="7" class="loading">Loading...</td></tr>';
@@ -182,11 +219,8 @@ async function addCustomer() {
     };
     if (!body.companyName || !body.email) { showError('custError', 'Company name and email are required'); return; }
     const res = await apiFetch('/api/customers', { method: 'POST', body: JSON.stringify(body) });
-    if (res?.ok) {
-        closeModal('addCustomerModal');
-        clearFields(['custCompany','custContact','custEmail','custPhone','custAddress']);
-        loadCustomers();
-    } else { showError('custError', 'Failed to create customer'); }
+    if (res?.ok) { closeModal('addCustomerModal'); clearFields(['custCompany','custContact','custEmail','custPhone','custAddress']); loadCustomers(); showToast('Customer added!'); }
+    else { showError('custError', 'Failed to create customer'); }
 }
 
 async function viewSites(customerId, companyName) {
@@ -201,18 +235,7 @@ async function viewSites(customerId, companyName) {
             <table class="data-table">
                 <thead><tr><th>ID</th><th>Name</th><th>City</th><th>Address</th></tr></thead>
                 <tbody>${sites.map(s => `<tr><td>${s.id}</td><td>${s.name}</td><td>${s.city||'-'}</td><td>${s.address}</td></tr>`).join('')}</tbody>
-            </table>` : '<p style="color:#888;margin-bottom:16px">No sites yet</p>'}
-            ${canEdit ? `
-            <div style="margin-top:20px;padding-top:16px;border-top:1px solid #eee">
-                <h4 style="margin-bottom:12px;color:#1e3a5f">Add New Site</h4>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-                    <input id="sName"  placeholder="Site name *"    style="padding:9px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px">
-                    <input id="sCity"  placeholder="City"           style="padding:9px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px">
-                    <input id="sAddr"  placeholder="Address *"      style="padding:9px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px">
-                    <input id="sPhone" placeholder="Contact phone"  style="padding:9px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px">
-                </div>
-                <button class="btn btn-primary btn-sm" style="margin-top:12px" onclick="addSite(${customerId})">Add Site</button>
-            </div>` : ''}
+            </table>` : '<p style="color:#888;margin-bottom:16px">No sites registered yet</p>'}
         </div>`;
     showModal('woDetailModal');
 }
@@ -221,11 +244,10 @@ async function addSite(customerId) {
     const body = { name: document.getElementById('sName').value, city: document.getElementById('sCity').value, address: document.getElementById('sAddr').value, contactPhone: document.getElementById('sPhone').value };
     if (!body.name || !body.address) { alert('Site name and address required'); return; }
     const res = await apiFetch(`/api/customers/${customerId}/sites`, { method: 'POST', body: JSON.stringify(body) });
-    if (res?.ok) { closeModal('woDetailModal'); showToast('Site added successfully!'); }
+    if (res?.ok) { closeModal('woDetailModal'); showToast('Site added!'); }
     else { alert('Failed to add site'); }
 }
 
-// ── Work Orders ───────────────────────────────────────────────────────────
 async function loadWorkOrders() {
     const tbody = document.getElementById('workOrdersTable');
     tbody.innerHTML = '<tr><td colspan="7" class="loading">Loading...</td></tr>';
@@ -239,11 +261,16 @@ async function loadWorkOrders() {
                 <td><strong>${w.code}</strong></td>
                 <td>${w.title}</td>
                 <td><span class="badge badge-${w.priority?.toLowerCase()}">${w.priority}</span></td>
-                <td><span class="badge badge-${statusClass(w.status)}">${formatStatus(w.status)}</span>
-                    ${w.slaBreached ? '<span style="color:#c62828;font-size:11px;margin-left:4px">⚠ SLA</span>' : ''}</td>
+                <td>
+                    <span class="badge badge-${statusClass(w.status)}">${formatStatus(w.status)}</span>
+                    ${w.assignedTo ? `<div style="font-size:11px;color:#888;margin-top:3px">👷 ${w.assignedTo.userName}</div>` : ''}
+                </td>
                 <td>${w.customer?.companyName || '-'}</td>
-                <td style="font-size:12px;color:${isSlaWarning(w.slaDueAt)?'#e65100':'#555'}">${w.slaDueAt ? formatDate(w.slaDueAt) : '-'}</td>
-                <td><button class="btn btn-sm btn-primary" onclick="viewWorkOrder(${w.id})">View</button></td>
+                <td style="font-size:12px">${w.slaDueAt ? formatDate(w.slaDueAt) : '-'}</td>
+                <td style="display:flex;gap:6px;flex-wrap:wrap">
+                    <button class="btn btn-sm btn-primary" onclick="viewWorkOrder(${w.id})">View</button>
+                    ${(['MANAGER','ADMIN','DISPATCHER'].includes(userRole) && w.status !== 'CLOSED' && w.status !== 'CANCELLED') ? `<button class="btn btn-sm btn-warning" onclick="openAssignModal(${w.id})">👷 Assign</button>` : ''}
+                </td>
             </tr>`).join('');
     } catch(e) { tbody.innerHTML = '<tr><td colspan="7" class="loading">Error loading</td></tr>'; }
 }
@@ -253,8 +280,7 @@ async function loadCustomersForWO() {
     if (!res) return;
     const customers = await res.json();
     const sel = document.getElementById('woCustomer');
-    sel.innerHTML = '<option value="">Select customer...</option>' +
-        customers.map(c => `<option value="${c.id}">${c.companyName}</option>`).join('');
+    sel.innerHTML = '<option value="">Select customer...</option>' + customers.map(c => `<option value="${c.id}">${c.companyName}</option>`).join('');
 }
 
 async function loadSitesForWO() {
@@ -264,39 +290,159 @@ async function loadSitesForWO() {
     if (!res) return;
     const sites = await res.json();
     const sel = document.getElementById('woSite');
-    sel.innerHTML = sites.length
-        ? '<option value="">Select site...</option>' + sites.map(s => `<option value="${s.id}">${s.name}</option>`).join('')
-        : '<option value="">No sites — add one first</option>';
+    sel.innerHTML = sites.length ? '<option value="">Select site...</option>' + sites.map(s => `<option value="${s.id}">${s.name}</option>`).join('') : '<option value="">No sites found</option>';
 }
 
 async function addWorkOrder() {
-    const body = {
-        title:       document.getElementById('woTitle').value,
-        description: document.getElementById('woDesc').value,
-        priority:    document.getElementById('woPriority').value,
-        customerId:  document.getElementById('woCustomer').value,
-        siteId:      document.getElementById('woSite').value
-    };
+    const body = { title: document.getElementById('woTitle').value, description: document.getElementById('woDesc').value, priority: document.getElementById('woPriority').value, customerId: document.getElementById('woCustomer').value, siteId: document.getElementById('woSite').value };
     if (!body.title || !body.customerId || !body.siteId) { showError('woError', 'Title, customer and site are required'); return; }
     const res = await apiFetch('/api/work-orders', { method: 'POST', body: JSON.stringify(body) });
-    if (res?.ok) {
-        closeModal('addWorkOrderModal');
-        clearFields(['woTitle','woDesc']);
-        loadWorkOrders();
-        showToast('Work order created!');
-    } else { showError('woError', 'Failed to create work order'); }
+    if (res?.ok) { closeModal('addWorkOrderModal'); clearFields(['woTitle','woDesc']); loadWorkOrders(); showToast('Work order created!'); }
+    else { showError('woError', 'Failed to create work order'); }
 }
 
 async function viewWorkOrder(id) {
-    const [woRes, histRes] = await Promise.all([
-        apiFetch(`/api/work-orders/${id}`),
-        apiFetch(`/api/work-orders/${id}/history`)
-    ]);
-    if (!woRes) return;
-    const wo      = await woRes.json();
-    const history = histRes ? await histRes.json() : [];
+    try {
+        const woRes = await apiFetch(`/api/work-orders/${id}`);
+        if (!woRes || !woRes.ok) {
+            console.error('Failed to load work order. Status:', woRes?.status);
+            return;
+        }
+        const wo = await woRes.json();
+        
+        const histRes = await apiFetch(`/api/work-orders/${id}/history`).catch(() => null);
+        const feedbackRes = await apiFetch(`/api/work-orders/${id}/feedback`).catch(() => null);
+        
+        const history  = histRes && histRes.ok ? await histRes.json().catch(() => []) : [];
+        const feedback = feedbackRes && feedbackRes.ok ? await feedbackRes.json().catch(() => null) : null;
+        
+        // Check if technician is viewing their assigned work order
+        const isTech = userRole === 'TECHNICIAN' && wo.assignedTo?.userEmail === currentUser?.email;
+        
+        if (isTech) {
+            // SPECIALIZED TECHNICIAN VIEW
+            showTechnicianWorkOrderView(id, wo, history, feedback);
+        } else {
+            // STANDARD VIEW (Manager, Dispatcher, Customer)
+            showStandardWorkOrderView(id, wo, history, feedback);
+        }
+    } catch(e) {
+        console.error('Error loading work order:', e);
+    }
+}
+
+function showTechnicianWorkOrderView(id, wo, history, feedback) {
+    const canLogWork = true;
+    const customer = wo.customer || {};
+    const site = wo.site || {};
+    
+    // Define technician workflow: ASSIGNED -> ACCEPT -> IN_PROGRESS -> COMPLETED
+    let techStatusButtons = '';
+    if (wo.status === 'ASSIGNED') {
+        techStatusButtons = `
+            <div style="background:#e8f5e9;border:1px solid #81c784;border-radius:8px;padding:16px;margin:16px 0">
+                <p style="color:#2e7d32;font-weight:600;margin-bottom:12px">🔧 Ready to work on this job?</p>
+                <button class="btn btn-success" onclick="transitionTechWorkflow(${id}, 'IN_PROGRESS', 'Accepted and starting work')">✓ Accept & Start Work</button>
+            </div>`;
+    } else if (wo.status === 'IN_PROGRESS') {
+        techStatusButtons = `
+            <div style="background:#fff3e0;border:1px solid #ffb74d;border-radius:8px;padding:16px;margin:16px 0">
+                <p style="color:#e65100;font-weight:600;margin-bottom:12px">⏳ Work in Progress</p>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                    <button class="btn btn-warning" onclick="transitionTechWorkflow(${id}, 'ON_HOLD', 'Work on hold')">⏸ Hold Work</button>
+                    <button class="btn btn-success" onclick="transitionTechWorkflow(${id}, 'COMPLETED', 'Work completed and ready for review')">✓ Mark Complete</button>
+                </div>
+            </div>`;
+    } else if (wo.status === 'ON_HOLD') {
+        techStatusButtons = `
+            <div style="background:#f3e5f5;border:1px solid #ba68c8;border-radius:8px;padding:16px;margin:16px 0">
+                <p style="color:#6a1b9a;font-weight:600;margin-bottom:12px">⏸ Work on Hold</p>
+                <button class="btn btn-info" onclick="transitionTechWorkflow(${id}, 'IN_PROGRESS', 'Resuming work')">▶ Resume Work</button>
+            </div>`;
+    } else if (wo.status === 'COMPLETED') {
+        techStatusButtons = `
+            <div style="background:#e0f2f1;border:1px solid #4db6ac;border-radius:8px;padding:16px;margin:16px 0">
+                <p style="color:#00695c;font-weight:600;margin-bottom:12px">✓ Work Completed</p>
+                <p style="color:#555;font-size:13px">Waiting for manager to review and close this work order.</p>
+            </div>`;
+    }
+
+    document.getElementById('woDetailTitle').textContent = wo.code + ' — ' + wo.title;
+    document.getElementById('woDetailContent').innerHTML = `
+        <div style="background:#f5f5f5;border-radius:8px;padding:16px;margin-bottom:16px">
+            <h4 style="color:#1565c0;margin-bottom:12px;margin-top:0">👤 Customer Details</h4>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                <div>
+                    <span style="color:#888;font-size:12px">Company Name</span>
+                    <p style="margin:4px 0;color:#333;font-weight:500">${customer.companyName || '—'}</p>
+                </div>
+                <div>
+                    <span style="color:#888;font-size:12px">Contact Number</span>
+                    <p style="margin:4px 0;color:#333;font-weight:500">${customer.contactNumber || customer.phone || '—'}</p>
+                </div>
+                <div style="grid-column:1/-1">
+                    <span style="color:#888;font-size:12px">📍 Service Location Address</span>
+                    <p style="margin:4px 0;color:#333;font-weight:500">${site.address || site.name || '—'}</p>
+                </div>
+                ${site.city ? `<div style="grid-column:1/-1"><span style="color:#888;font-size:12px">City</span><p style="margin:4px 0;color:#333;font-weight:500">${site.city}</p></div>` : ''}
+            </div>
+        </div>
+
+        <div class="detail-grid">
+            <div class="detail-item"><label>Work Order</label><span><strong>${wo.code}</strong></span></div>
+            <div class="detail-item"><label>Status</label><span class="badge badge-${statusClass(wo.status)}">${formatStatus(wo.status)}</span></div>
+            <div class="detail-item"><label>Priority</label><span class="badge badge-${wo.priority?.toLowerCase()}">${wo.priority}</span></div>
+            <div class="detail-item"><label>Title</label><span>${wo.title}</span></div>
+            <div class="detail-item" style="grid-column:1/-1"><label>Description</label><span>${wo.description || '—'}</span></div>
+            ${wo.problemPhoto ? `<div class="detail-item" style="grid-column:1/-1"><label>Problem Photo</label><br><img src="${wo.problemPhoto}" style="max-width:100%;max-height:300px;border-radius:8px;margin-top:8px;border:1px solid #ddd"></div>` : ''}
+        </div>
+
+        ${techStatusButtons}
+
+        ${canLogWork && wo.status === 'IN_PROGRESS' ? `
+        <div style="padding:16px;border:1px solid #e0e0e0;border-radius:8px;background:#fafafa;margin:16px 0">
+            <strong style="font-size:13px;color:#555;display:block;margin-bottom:10px">📊 Log Work:</strong>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+                <div><label style="font-size:12px;color:#888;display:block">Part</label><select id="partSelect" style="padding:7px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;min-width:150px"><option value="">Select part...</option></select></div>
+                <div><label style="font-size:12px;color:#888;display:block">Qty</label><input id="partQty" type="number" value="1" min="1" style="padding:7px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;width:70px"></div>
+                <button class="btn btn-sm btn-success" onclick="logParts(${id})">Log Parts</button>
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:10px">
+                <div><label style="font-size:12px;color:#888;display:block">Minutes</label><input id="timeMinutes" type="number" min="1" placeholder="e.g. 60" style="padding:7px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;width:100px"></div>
+                <div><label style="font-size:12px;color:#888;display:block">Note</label><input id="timeNote" type="text" placeholder="Optional" style="padding:7px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;width:180px"></div>
+                <button class="btn btn-sm btn-success" onclick="logTime(${id})">Log Time</button>
+            </div>
+        </div>` : ''}
+
+        ${feedback && feedback.length > 0 ? `
+        <div style="padding:16px 24px;border:1px solid #f0f0f0;background:#f9fff9;border-radius:8px;margin:16px 0">
+            <h4 style="color:#2e7d32;margin-bottom:15px">⭐ Customer Feedback (${feedback.length})</h4>
+            ${feedback.map((f, i) => `
+            <div style="margin-bottom:${i < feedback.length - 1 ? '15px;padding-bottom:15px;border-bottom:1px solid #e0e0e0' : '0'}">
+                <div style="display:flex;gap:6px;margin-bottom:8px">${'★'.repeat(f.rating)}${'☆'.repeat(5 - f.rating)}</div>
+                <p style="color:#333;margin-bottom:8px">${f.comment || 'No comment'}</p>
+                ${f.feedbackPhoto ? `<img src="${f.feedbackPhoto}" style="max-width:100%;max-height:220px;border-radius:8px;border:1px solid #ddd;margin-bottom:8px">` : ''}
+                <p style="font-size:12px;color:#888">${formatDate(f.submittedAt)}</p>
+            </div>
+            `).join('')}
+        </div>` : ''}
+
+        <div class="history-table">
+            <h4>Status History</h4>
+            ${history.length ? `
+            <table class="data-table">
+                <thead><tr><th>Status</th><th>By</th><th>When</th><th>Note</th></tr></thead>
+                <tbody>${history.map(h => `<tr><td><span class="badge badge-${statusClass(h.toStatus)}">${formatStatus(h.toStatus)}</span></td><td style="font-size:12px">${h.changedBy||'-'}</td><td style="font-size:12px">${formatDate(h.changedAt)}</td><td style="font-size:12px">${h.note||'-'}</td></tr>`).join('')}</tbody>
+            </table>` : '<p style="color:#888;font-size:13px">No history yet</p>'}
+        </div>`;
+
+    showModal('woDetailModal');
+    if (wo.status === 'IN_PROGRESS') loadPartsDropdown();
+}
+
+function showStandardWorkOrderView(id, wo, history, feedback) {
     const transitions = getAvailableTransitions(wo.status);
-    const canAssign = ['MANAGER','ADMIN','DISPATCHER'].includes(userRole);
+    const canAssign  = ['MANAGER','ADMIN','DISPATCHER'].includes(userRole);
     const canLogWork = ['TECHNICIAN','EMPLOYEE','MANAGER','ADMIN'].includes(userRole);
 
     document.getElementById('woDetailTitle').textContent = wo.code + ' — ' + wo.title;
@@ -307,76 +453,53 @@ async function viewWorkOrder(id) {
             <div class="detail-item"><label>Customer</label><span>${wo.customer?.companyName || '-'}</span></div>
             <div class="detail-item"><label>Site</label><span>${wo.site?.name || '-'}</span></div>
             <div class="detail-item"><label>Assigned To</label><span>${wo.assignedTo?.userName || '— Not assigned —'}</span></div>
-            <div class="detail-item"><label>SLA Due</label><span style="color:${isSlaWarning(wo.slaDueAt)?'#e65100':'#333'}">${wo.slaDueAt ? formatDate(wo.slaDueAt) : '-'}</span></div>
-            <div class="detail-item"><label>SLA Breached</label><span style="color:${wo.slaBreached?'#c62828':'#388e3c'}">${wo.slaBreached ? '⚠ YES' : '✓ No'}</span></div>
             <div class="detail-item"><label>Created</label><span>${wo.createdAt ? formatDate(wo.createdAt) : '-'}</span></div>
             <div class="detail-item" style="grid-column:1/-1"><label>Description</label><span>${wo.description || '—'}</span></div>
+            ${wo.problemPhoto ? `<div class="detail-item" style="grid-column:1/-1"><label>Problem Photo</label><br><img src="${wo.problemPhoto}" style="max-width:100%;max-height:300px;border-radius:8px;margin-top:8px;border:1px solid #ddd"></div>` : ''}
         </div>
-
-        ${transitions.length ? `
-        <div class="transition-buttons">
-            <strong style="font-size:13px;color:#555;margin-right:8px">Change Status:</strong>
-            ${transitions.map(t => `<button class="btn btn-sm ${t.cls}" onclick="transition(${id},'${t.status}')">${t.label}</button>`).join('')}
-        </div>` : '<div style="padding:0 24px 12px;color:#888;font-size:13px">No transitions available for this status.</div>'}
-
+        ${transitions.length ? `<div class="transition-buttons"><strong style="font-size:13px;color:#555;margin-right:8px">Change Status:</strong>${transitions.map(t => `<button class="btn btn-sm ${t.cls}" onclick="transition(${id},'${t.status}')">${t.label}</button>`).join('')}</div>` : ''}
         ${canAssign && wo.status !== 'CLOSED' && wo.status !== 'CANCELLED' ? `
         <div style="padding:0 24px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
             <strong style="font-size:13px;color:#555">Assign to Technician:</strong>
-            <select id="assignTechSelect" style="padding:7px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px">
-                <option value="">Loading technicians...</option>
-            </select>
+            <select id="assignTechSelect" style="padding:7px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px"><option value="">Loading...</option></select>
             <button class="btn btn-sm btn-warning" onclick="assignTechnician(${id})">Assign</button>
         </div>` : ''}
-
         ${canLogWork && wo.status === 'IN_PROGRESS' ? `
         <div style="padding:0 24px 16px;border-top:1px solid #f0f0f0;padding-top:14px">
             <strong style="font-size:13px;color:#555;display:block;margin-bottom:10px">Log Work:</strong>
-            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-                <div>
-                    <label style="font-size:12px;color:#888;display:block">Parts Used</label>
-                    <select id="partSelect" style="padding:7px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;min-width:150px">
-                        <option value="">Select part...</option>
-                    </select>
-                </div>
-                <div>
-                    <label style="font-size:12px;color:#888;display:block">Qty</label>
-                    <input id="partQty" type="number" value="1" min="1" style="padding:7px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;width:70px">
-                </div>
-                <button class="btn btn-sm btn-success" style="margin-top:16px" onclick="logParts(${id})">Log Parts</button>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+                <div><label style="font-size:12px;color:#888;display:block">Part</label><select id="partSelect" style="padding:7px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;min-width:150px"><option value="">Select part...</option></select></div>
+                <div><label style="font-size:12px;color:#888;display:block">Qty</label><input id="partQty" type="number" value="1" min="1" style="padding:7px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;width:70px"></div>
+                <button class="btn btn-sm btn-success" onclick="logParts(${id})">Log Parts</button>
             </div>
-            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px">
-                <div>
-                    <label style="font-size:12px;color:#888;display:block">Time (minutes)</label>
-                    <input id="timeMinutes" type="number" min="1" placeholder="e.g. 60" style="padding:7px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;width:120px">
-                </div>
-                <div>
-                    <label style="font-size:12px;color:#888;display:block">Note</label>
-                    <input id="timeNote" type="text" placeholder="Optional note" style="padding:7px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;width:200px">
-                </div>
-                <button class="btn btn-sm btn-success" style="margin-top:16px" onclick="logTime(${id})">Log Time</button>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:10px">
+                <div><label style="font-size:12px;color:#888;display:block">Minutes</label><input id="timeMinutes" type="number" min="1" placeholder="e.g. 60" style="padding:7px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;width:100px"></div>
+                <div><label style="font-size:12px;color:#888;display:block">Note</label><input id="timeNote" type="text" placeholder="Optional" style="padding:7px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;width:180px"></div>
+                <button class="btn btn-sm btn-success" onclick="logTime(${id})">Log Time</button>
             </div>
         </div>` : ''}
-
+        ${feedback && feedback.length > 0 ? `
+        <div style="padding:16px 24px;border-top:1px solid #f0f0f0;background:#f9fff9;border-radius:0 0 8px 8px">
+            <h4 style="color:#2e7d32;margin-bottom:15px">⭐ Customer Feedback (${feedback.length})</h4>
+            ${feedback.map((f, i) => `
+            <div style="margin-bottom:${i < feedback.length - 1 ? '15px;padding-bottom:15px;border-bottom:1px solid #e0e0e0' : '0'}">
+                <div style="display:flex;gap:6px;margin-bottom:8px">${'★'.repeat(f.rating)}${'☆'.repeat(5 - f.rating)}</div>
+                <p style="color:#333;margin-bottom:8px">${f.comment || 'No comment'}</p>
+                ${f.feedbackPhoto ? `<img src="${f.feedbackPhoto}" style="max-width:100%;max-height:220px;border-radius:8px;border:1px solid #ddd;margin-bottom:8px">` : ''}
+                <p style="font-size:12px;color:#888">${formatDate(f.submittedAt)}</p>
+            </div>
+            `).join('')}
+        </div>` : ''}
         <div class="history-table">
             <h4>Status History</h4>
             ${history.length ? `
             <table class="data-table">
-                <thead><tr><th>From</th><th>To</th><th>By</th><th>When</th><th>Note</th></tr></thead>
-                <tbody>${history.map(h => `
-                    <tr>
-                        <td>${h.fromStatus ? formatStatus(h.fromStatus) : '—'}</td>
-                        <td><span class="badge badge-${statusClass(h.toStatus)}">${formatStatus(h.toStatus)}</span></td>
-                        <td style="font-size:12px">${h.changedBy || '-'}</td>
-                        <td style="font-size:12px">${formatDate(h.changedAt)}</td>
-                        <td style="font-size:12px">${h.note || '-'}</td>
-                    </tr>`).join('')}
-                </tbody>
+                <thead><tr><th>Status</th><th>By</th><th>When</th><th>Note</th></tr></thead>
+                <tbody>${history.map(h => `<tr><td><span class="badge badge-${statusClass(h.toStatus)}">${formatStatus(h.toStatus)}</span></td><td style="font-size:12px">${h.changedBy||'-'}</td><td style="font-size:12px">${formatDate(h.changedAt)}</td><td style="font-size:12px">${h.note||'-'}</td></tr>`).join('')}</tbody>
             </table>` : '<p style="color:#888;font-size:13px">No history yet</p>'}
         </div>`;
 
     showModal('woDetailModal');
-
-    // Load technicians and parts in background
     if (canAssign && wo.status !== 'CLOSED' && wo.status !== 'CANCELLED') loadTechnicians();
     if (canLogWork && wo.status === 'IN_PROGRESS') loadPartsDropdown();
 }
@@ -384,13 +507,30 @@ async function viewWorkOrder(id) {
 async function loadTechnicians() {
     const sel = document.getElementById('assignTechSelect');
     if (!sel) return;
-    try {
-        const res = await apiFetch('/api/users/technicians');
-        if (!res || !res.ok) { sel.innerHTML = '<option value="">No technicians found</option>'; return; }
-        const techs = await res.json();
-        sel.innerHTML = '<option value="">Select technician...</option>' +
-            techs.map(t => `<option value="${t.id}">${t.userName} (${t.userEmail})</option>`).join('');
-    } catch(e) { sel.innerHTML = '<option value="">Error loading</option>'; }
+    const res = await apiFetch('/api/users/technicians');
+    if (!res || !res.ok) { sel.innerHTML = '<option value="">No technicians</option>'; return; }
+    const techs = await res.json();
+    sel.innerHTML = '<option value="">Select technician...</option>' + techs.map(t => `<option value="${t.id}">${t.userName} (${t.userEmail})</option>`).join('');
+}
+
+async function openAssignModal(workOrderId) {
+    document.getElementById('assignModalWoId').value = workOrderId;
+    document.getElementById('assignModalSelect').innerHTML = '<option value="">Loading...</option>';
+    document.getElementById('assignModalError').style.display = 'none';
+    showModal('assignTechModal');
+    const res = await apiFetch('/api/users/technicians');
+    if (!res || !res.ok) { document.getElementById('assignModalSelect').innerHTML = '<option value="">No technicians found</option>'; return; }
+    const techs = await res.json();
+    document.getElementById('assignModalSelect').innerHTML = '<option value="">Select technician...</option>' + techs.map(t => `<option value="${t.id}">${t.userName} — ${t.userEmail}</option>`).join('');
+}
+
+async function confirmAssign() {
+    const workOrderId = document.getElementById('assignModalWoId').value;
+    const techId = document.getElementById('assignModalSelect').value;
+    if (!techId) { showError('assignModalError', 'Please select a technician'); return; }
+    const res = await apiFetch(`/api/work-orders/${workOrderId}/assign`, { method: 'POST', body: JSON.stringify({ technicianId: techId }) });
+    if (res?.ok) { closeModal('assignTechModal'); loadWorkOrders(); showToast('Technician assigned!'); }
+    else { showError('assignModalError', 'Failed to assign. Try again.'); }
 }
 
 async function loadPartsDropdown() {
@@ -399,37 +539,34 @@ async function loadPartsDropdown() {
     const res = await apiFetch('/api/parts');
     if (!res || !res.ok) return;
     const parts = await res.json();
-    sel.innerHTML = '<option value="">Select part...</option>' +
-        parts.map(p => `<option value="${p.id}">${p.name} (Stock: ${p.stockQty})</option>`).join('');
+    sel.innerHTML = '<option value="">Select part...</option>' + parts.map(p => `<option value="${p.id}">${p.name} (Stock: ${p.stockQty})</option>`).join('');
 }
 
 async function assignTechnician(workOrderId) {
     const techId = document.getElementById('assignTechSelect').value;
     if (!techId) { alert('Please select a technician'); return; }
-    const res = await apiFetch(`/api/work-orders/${workOrderId}/assign`, {
-        method: 'POST',
-        body: JSON.stringify({ technicianId: techId })
-    });
-    if (res?.ok) {
-        closeModal('woDetailModal');
-        loadWorkOrders();
-        showToast('Technician assigned successfully!');
-    } else { alert('Failed to assign technician'); }
+    const res = await apiFetch(`/api/work-orders/${workOrderId}/assign`, { method: 'POST', body: JSON.stringify({ technicianId: techId }) });
+    if (res?.ok) { closeModal('woDetailModal'); loadWorkOrders(); showToast('Technician assigned!'); }
+    else { alert('Failed to assign'); }
 }
 
 async function transition(id, status) {
-    const note = prompt(`Add a note for: ${formatStatus(status)} (optional):`) || '';
-    const res = await apiFetch(`/api/work-orders/${id}/status`, {
-        method: 'POST',
-        body: JSON.stringify({ status, note })
-    });
-    if (res?.ok) {
-        closeModal('woDetailModal');
-        loadWorkOrders();
-        showToast('Status updated to ' + formatStatus(status));
-    } else {
-        const err = await res?.text();
-        alert('Not allowed: ' + (err || 'Invalid transition'));
+    const note = prompt(`Note for: ${formatStatus(status)} (optional):`) || '';
+    const res = await apiFetch(`/api/work-orders/${id}/status`, { method: 'POST', body: JSON.stringify({ status, note }) });
+    if (res?.ok) { closeModal('woDetailModal'); loadWorkOrders(); showToast('Status updated to ' + formatStatus(status)); }
+    else { const e = await res?.text(); alert('Not allowed: ' + (e || 'Invalid transition')); }
+}
+
+async function transitionTechWorkflow(id, status, defaultNote) {
+    const note = prompt(`Note for ${formatStatus(status)} (optional):`, defaultNote) || defaultNote || '';
+    const res = await apiFetch(`/api/work-orders/${id}/status`, { method: 'POST', body: JSON.stringify({ status, note }) });
+    if (res?.ok) { 
+        closeModal('woDetailModal'); 
+        loadTechDashboard(); 
+        showToast('✓ ' + formatStatus(status) + ' - All team members have been notified'); 
+    } else { 
+        const e = await res?.text(); 
+        alert('Status update failed: ' + (e || 'Invalid transition')); 
     }
 }
 
@@ -437,10 +574,7 @@ async function logParts(workOrderId) {
     const partId = document.getElementById('partSelect').value;
     const qty    = parseInt(document.getElementById('partQty').value) || 1;
     if (!partId) { alert('Please select a part'); return; }
-    const res = await apiFetch(`/api/work-orders/${workOrderId}/parts`, {
-        method: 'POST',
-        body: JSON.stringify({ partId, qty })
-    });
+    const res = await apiFetch(`/api/work-orders/${workOrderId}/parts`, { method: 'POST', body: JSON.stringify({ partId, qty }) });
     if (res?.ok) { showToast('Parts logged!'); loadPartsDropdown(); }
     else { const e = await res?.text(); alert('Failed: ' + e); }
 }
@@ -449,46 +583,26 @@ async function logTime(workOrderId) {
     const minutes = parseInt(document.getElementById('timeMinutes').value);
     const note    = document.getElementById('timeNote').value;
     if (!minutes || minutes < 1) { alert('Please enter valid minutes'); return; }
-    const res = await apiFetch(`/api/work-orders/${workOrderId}/time`, {
-        method: 'POST',
-        body: JSON.stringify({ minutes, note })
-    });
-    if (res?.ok) { showToast(`${minutes} minutes logged!`); document.getElementById('timeMinutes').value = ''; document.getElementById('timeNote').value = ''; }
+    const res = await apiFetch(`/api/work-orders/${workOrderId}/time`, { method: 'POST', body: JSON.stringify({ minutes, note }) });
+    if (res?.ok) { showToast(`${minutes} minutes logged!`); document.getElementById('timeMinutes').value = ''; }
     else { alert('Failed to log time'); }
 }
 
 function getAvailableTransitions(status) {
     const isMgr  = ['MANAGER','ADMIN'].includes(userRole);
-    const isDis  = ['DISPATCHER'].includes(userRole);
+    const isDis  = userRole === 'DISPATCHER';
     const isTech = ['TECHNICIAN','EMPLOYEE'].includes(userRole);
     const map = {
-        'NEW':         [
-            ...(isMgr||isDis ? [{ status:'ASSIGNED',    label:'Assign',       cls:'btn-warning' }] : []),
-            ...(isMgr        ? [{ status:'CANCELLED',   label:'Cancel',       cls:'btn-danger'  }] : [])
-        ],
-        'ASSIGNED':    [
-            ...(isTech||isMgr ? [{ status:'IN_PROGRESS', label:'▶ Start Work', cls:'btn-success' }] : []),
-            ...(isMgr||isDis  ? [{ status:'CANCELLED',   label:'Cancel',       cls:'btn-danger'  }] : [])
-        ],
-        'IN_PROGRESS': [
-            ...(isTech||isMgr ? [{ status:'ON_HOLD',   label:'⏸ Hold',      cls:'btn-warning' }] : []),
-            ...(isTech||isMgr ? [{ status:'COMPLETED', label:'✓ Complete',  cls:'btn-success' }] : [])
-        ],
-        'ON_HOLD':     [
-            ...(isTech||isMgr ? [{ status:'IN_PROGRESS', label:'▶ Resume',  cls:'btn-success' }] : []),
-            ...(isMgr         ? [{ status:'CANCELLED',   label:'Cancel',    cls:'btn-danger'  }] : [])
-        ],
-        'COMPLETED':   [
-            ...(isMgr ? [{ status:'CLOSED',      label:'✓ Close',   cls:'btn-primary' }] : []),
-            ...(isMgr ? [{ status:'IN_PROGRESS', label:'↩ Reopen',  cls:'btn-warning' }] : [])
-        ],
-        'CLOSED':      [],
-        'CANCELLED':   []
+        'NEW':         [...(isMgr||isDis ? [{ status:'ASSIGNED', label:'Assign', cls:'btn-warning' }] : []), ...(isMgr ? [{ status:'CANCELLED', label:'Cancel', cls:'btn-danger' }] : [])],
+        'ASSIGNED':    [...(isTech||isMgr ? [{ status:'IN_PROGRESS', label:'▶ Start Work', cls:'btn-success' }] : []), ...(isMgr||isDis ? [{ status:'CANCELLED', label:'Cancel', cls:'btn-danger' }] : [])],
+        'IN_PROGRESS': [...(isTech||isMgr ? [{ status:'ON_HOLD', label:'⏸ Hold', cls:'btn-warning' }] : []), ...(isTech||isMgr ? [{ status:'COMPLETED', label:'✓ Complete', cls:'btn-success' }] : [])],
+        'ON_HOLD':     [...(isTech||isMgr ? [{ status:'IN_PROGRESS', label:'▶ Resume', cls:'btn-success' }] : []), ...(isMgr ? [{ status:'CANCELLED', label:'Cancel', cls:'btn-danger' }] : [])],
+        'COMPLETED':   [...(isMgr ? [{ status:'CLOSED', label:'✓ Close', cls:'btn-primary' }] : []), ...(isMgr ? [{ status:'IN_PROGRESS', label:'↩ Reopen', cls:'btn-warning' }] : [])],
+        'CLOSED': [], 'CANCELLED': []
     };
     return map[status] || [];
 }
 
-// ── Parts ─────────────────────────────────────────────────────────────────
 async function loadParts() {
     const tbody = document.getElementById('partsTable');
     tbody.innerHTML = '<tr><td colspan="6" class="loading">Loading...</td></tr>';
@@ -500,31 +614,20 @@ async function loadParts() {
         const canDelete = ['MANAGER','ADMIN'].includes(userRole);
         tbody.innerHTML = data.map(p => `
             <tr>
-                <td>${p.id}</td>
-                <td><strong>${p.name}</strong></td>
-                <td><code>${p.sku}</code></td>
-                <td>₹${p.unitCost?.toFixed(2) || '0.00'}</td>
-                <td><span style="color:${p.stockQty < 5 ? '#c62828' : '#388e3c'};font-weight:600">${p.stockQty} ${p.stockQty < 5 ? '⚠' : ''}</span></td>
+                <td>${p.id}</td><td><strong>${p.name}</strong></td><td><code>${p.sku}</code></td>
+                <td>₹${p.unitCost?.toFixed(2)||'0.00'}</td>
+                <td><span style="color:${p.stockQty<5?'#c62828':'#388e3c'};font-weight:600">${p.stockQty}${p.stockQty<5?' ⚠':''}</span></td>
                 <td>${canDelete ? `<button class="btn btn-sm btn-danger" onclick="deletePart(${p.id})">Delete</button>` : '—'}</td>
             </tr>`).join('');
     } catch(e) { tbody.innerHTML = '<tr><td colspan="6" class="loading">Error</td></tr>'; }
 }
 
 async function addPart() {
-    const body = {
-        name:     document.getElementById('partName').value,
-        sku:      document.getElementById('partSku').value,
-        unitCost: parseFloat(document.getElementById('partCost').value) || 0,
-        stockQty: parseInt(document.getElementById('partStock').value) || 0
-    };
+    const body = { name: document.getElementById('partName').value, sku: document.getElementById('partSku').value, unitCost: parseFloat(document.getElementById('partCost').value)||0, stockQty: parseInt(document.getElementById('partStock').value)||0 };
     if (!body.name || !body.sku) { showError('partError', 'Name and SKU are required'); return; }
     const res = await apiFetch('/api/parts', { method: 'POST', body: JSON.stringify(body) });
-    if (res?.ok) {
-        closeModal('addPartModal');
-        clearFields(['partName','partSku','partCost','partStock']);
-        loadParts();
-        showToast('Part added!');
-    } else { showError('partError', 'Failed to add part'); }
+    if (res?.ok) { closeModal('addPartModal'); clearFields(['partName','partSku','partCost','partStock']); loadParts(); showToast('Part added!'); }
+    else { showError('partError', 'Failed to add part'); }
 }
 
 async function deletePart(id) {
@@ -534,14 +637,351 @@ async function deletePart(id) {
     else { alert('Failed to delete'); }
 }
 
-// ── Modal ─────────────────────────────────────────────────────────────────
+async function loadPortal() {
+    const tbody = document.getElementById('portalTable');
+    tbody.innerHTML = '<tr><td colspan="7" class="loading">Loading your requests...</td></tr>';
+    try {
+        const res = await apiFetch('/api/portal/my-orders');
+        if (!res || !res.ok) {
+            tbody.innerHTML = '<tr><td colspan="6" class="loading">No requests yet. Click Raise New Request to submit one.</td></tr>';
+            document.getElementById('portalWelcome').innerHTML = `
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:14px">
+                    <span style="font-size:18px;font-weight:700;color:#1e3a5f">Your Requests:</span>
+                    <span style="font-size:22px;font-weight:800;color:#2d6a9f">0</span>
+                </div>`;
+            await loadPortalSites();
+            return;
+        }
+        const data = await res.json();
+
+        const counts = { new: 0, assigned: 0, accepted: 0, completed: 0, closed: 0 };
+        data.forEach(w => {
+            if (w.status === 'NEW')         counts.new++;
+            else if (w.status === 'ASSIGNED') counts.assigned++;
+            else if (w.status === 'IN_PROGRESS') counts.accepted++;
+            else if (w.status === 'COMPLETED')   counts.completed++;
+            else if (w.status === 'CLOSED')      counts.closed++;
+        });
+
+        document.getElementById('portalWelcome').innerHTML = `
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:14px">
+                <span style="font-size:18px;font-weight:700;color:#1e3a5f">Your Requests:</span>
+                <span style="font-size:22px;font-weight:800;color:#2d6a9f">${data.length}</span>
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+                ${counts.new        ? `<span style="background:#e3f2fd;color:#1565c0;padding:5px 14px;border-radius:20px;font-size:13px;font-weight:600">🕐 Pending: ${counts.new}</span>` : ''}
+                ${counts.assigned   ? `<span style="background:#fff3e0;color:#e65100;padding:5px 14px;border-radius:20px;font-size:13px;font-weight:600">👷 Technician Assigned: ${counts.assigned}</span>` : ''}
+                ${counts.accepted   ? `<span style="background:#f3e5f5;color:#6a1b9a;padding:5px 14px;border-radius:20px;font-size:13px;font-weight:600">🔧 Work in Progress: ${counts.accepted}</span>` : ''}
+                ${counts.completed  ? `<span style="background:#e8f5e9;color:#2e7d32;padding:5px 14px;border-radius:20px;font-size:13px;font-weight:600">✅ Completed: ${counts.completed}</span>` : ''}
+                ${counts.closed     ? `<span style="background:#f5f5f5;color:#555;padding:5px 14px;border-radius:20px;font-size:13px;font-weight:600">🔒 Closed: ${counts.closed}</span>` : ''}
+                ${data.length === 0 ? `<span style="color:#888;font-size:13px">No requests yet. Click + Raise New Request to get started.</span>` : ''}
+            </div>`;
+
+        if (!data.length) { tbody.innerHTML = '<tr><td colspan="6" class="loading">No requests yet. Click Raise New Request to submit one.</td></tr>'; }
+        else {
+            tbody.innerHTML = data.map(w => `
+            <tr>
+                <td><strong>${w.code}</strong></td>
+                <td>${w.title}</td>
+                <td><span class="badge badge-${w.priority?.toLowerCase()}">${w.priority}</span></td>
+                <td><span class="badge badge-${statusClass(w.status)}">${customerStatusLabel(w.status)}</span></td>
+                <td>${w.site?.name || '-'}</td>
+                <td>
+                    ${(w.status !== 'COMPLETED' && w.status !== 'CLOSED') ? `<button class="btn btn-sm btn-outline" onclick="viewWorkOrder(${w.id})">View</button>` : ''}
+                    ${(w.status === 'COMPLETED' || w.status === 'CLOSED') ? `<button class="btn btn-sm btn-success" ${w.status === 'COMPLETED' ? '' : 'style="margin-left:4px"'} onclick="openFeedbackModal(${w.id})">⭐ Feedback</button>` : ''}
+                </td>
+            </tr>`).join('');
+        }
+        await loadPortalSites();
+    } catch(e) { tbody.innerHTML = '<tr><td colspan="6" class="loading">Error loading</td></tr>'; }
+}
+
+async function loadPortalSites() {
+    const res = await apiFetch('/api/portal/my-sites');
+    if (!res || !res.ok) return;
+    const customer = await res.json();
+    if (!customer || !customer.id) return;
+    const sitesRes = await apiFetch(`/api/customers/${customer.id}/sites`);
+    if (!sitesRes || !sitesRes.ok) return;
+    const sites = await sitesRes.json();
+    const sel = document.getElementById('reqSite');
+    const manualInput = document.getElementById('reqManualAddress');
+    if (sel) {
+        if (sites.length) {
+            sel.innerHTML = '<option value="">Select site...</option>' + sites.map(s => `<option value="${s.id}">${s.name} — ${s.address}</option>`).join('');
+            sel.style.display = '';
+            if (manualInput) manualInput.style.display = 'none';
+        } else {
+            sel.innerHTML = '<option value="new">+ Enter address manually</option>';
+            sel.style.display = '';
+            if (manualInput) manualInput.style.display = 'block';
+        }
+    }
+}
+
+function toggleManualAddress(sel) {
+    const manualInput = document.getElementById('reqManualAddress');
+    if (!manualInput) return;
+    manualInput.style.display = (sel.value === 'new' || sel.value === '') ? 'block' : 'none';
+}
+
+async function raiseRequest() {
+    const photoInput = document.getElementById('reqPhoto');
+    let problemPhoto = '';
+    if (photoInput && photoInput.files && photoInput.files[0]) {
+        problemPhoto = await toBase64(photoInput.files[0]);
+    }
+
+    let siteId = document.getElementById('reqSite').value;
+    const manualAddress = document.getElementById('reqManualAddress')?.value?.trim();
+
+    if (siteId === 'new' || siteId === '') {
+        if (!manualAddress) { showError('reqError', 'Please enter your address'); return; }
+        const siteRes = await apiFetch('/api/portal/add-site', {
+            method: 'POST',
+            body: JSON.stringify({ name: 'Main Location', address: manualAddress })
+        });
+        if (!siteRes || !siteRes.ok) { showError('reqError', 'Failed to save your address. Try again.'); return; }
+        const newSite = await siteRes.json();
+        siteId = newSite.id;
+    }
+
+    const body = {
+        title:        document.getElementById('reqTitle').value,
+        description:  document.getElementById('reqDesc').value,
+        priority:     document.getElementById('reqPriority').value,
+        siteId:       siteId,
+        problemPhoto: problemPhoto
+    };
+    if (!body.title || !siteId) { showError('reqError', 'Title and site are required'); return; }
+    const res = await apiFetch('/api/portal/raise-request', { method: 'POST', body: JSON.stringify(body) });
+    if (res?.ok) {
+        closeModal('raiseRequestModal');
+        clearFields(['reqTitle','reqDesc']);
+        if (photoInput) photoInput.value = '';
+        document.getElementById('reqPhotoPreview').style.display = 'none';
+        loadPortal();
+        showToast('Request submitted successfully!');
+    } else {
+        const e = await res?.text();
+        showError('reqError', 'Failed: ' + (e || 'Unknown error'));
+    }
+}
+
+async function loadUsers() {
+    const tbody = document.getElementById('usersTable');
+    tbody.innerHTML = '<tr><td colspan="6" class="loading">Loading...</td></tr>';
+    try {
+        const res = await apiFetch('/api/users/staff');
+        if (!res || !res.ok) { tbody.innerHTML = '<tr><td colspan="6" class="loading">No access</td></tr>'; return; }
+        const data = await res.json();
+        // Filter to show only TECHNICIAN role, not DISPATCHER
+        const technicians = data.filter(u => u.role === 'TECHNICIAN');
+        if (!technicians.length) { tbody.innerHTML = '<tr><td colspan="6" class="loading">No technicians added yet. Click Add Technician to create accounts.</td></tr>'; return; }
+        tbody.innerHTML = technicians.map(u => `
+            <tr>
+                <td>${u.id}</td>
+                <td><strong>${u.userName}</strong></td>
+                <td>${u.userEmail}</td>
+                <td><span class="badge" style="background:#fff3e0;color:#e65100">${u.role}</span></td>
+                <td>${u.phone || '-'}</td>
+                <td><button class="btn btn-sm btn-danger" onclick="deleteStaff(${u.id}, '${u.userName}')">Remove</button></td>
+            </tr>`).join('');
+    } catch(e) { tbody.innerHTML = '<tr><td colspan="6" class="loading">Error loading</td></tr>'; }
+}
+
+async function addStaff() {
+    const body = {
+        userName: document.getElementById('staffName').value,
+        userEmail: document.getElementById('staffEmail').value,
+        password: document.getElementById('staffPassword').value,
+        phone: document.getElementById('staffPhone').value,
+        role: document.getElementById('staffRole').value
+    };
+    if (!body.userName || !body.userEmail || !body.password) { showError('staffError', 'Name, email and password are required'); return; }
+    const res = await apiFetch('/api/users/staff', { method: 'POST', body: JSON.stringify(body) });
+    if (res?.ok) {
+        closeModal('addUserModal');
+        clearFields(['staffName','staffEmail','staffPassword','staffPhone']);
+        loadUsers();
+        showToast(`${body.role} account created for ${body.userEmail}`);
+    } else {
+        const e = await res?.text();
+        showError('staffError', e || 'Failed to create user');
+    }
+}
+
+async function deleteStaff(id, name) {
+    if (!confirm(`Remove ${name} from the system?`)) return;
+    const res = await apiFetch(`/api/users/staff/${id}`, { method: 'DELETE' });
+    if (res?.ok) { loadUsers(); showToast(`${name} removed`); }
+    else { alert('Failed to remove user'); }
+}
+
+// DISPATCHER MANAGEMENT FUNCTIONS
+async function loadDispatchers() {
+    const tbody = document.getElementById('dispatchersTable');
+    tbody.innerHTML = '<tr><td colspan="6" class="loading">Loading...</td></tr>';
+    try {
+        const res = await apiFetch('/api/users/dispatchers');
+        if (!res || !res.ok) { tbody.innerHTML = '<tr><td colspan="6" class="loading">No access</td></tr>'; return; }
+        const data = await res.json();
+        if (!data.length) { tbody.innerHTML = '<tr><td colspan="6" class="loading">No dispatchers added yet. Click Add Dispatcher to create accounts.</td></tr>'; return; }
+        tbody.innerHTML = data.map(u => `
+            <tr>
+                <td>${u.id}</td>
+                <td><strong>${u.userName}</strong></td>
+                <td>${u.userEmail}</td>
+                <td>${u.phone || '-'}</td>
+                <td><span class="badge" style="background:#e8f5e9;color:#2e7d32">Active</span></td>
+                <td><button class="btn btn-sm btn-danger" onclick="deleteDispatcher(${u.id}, '${u.userName}')">Remove</button></td>
+            </tr>`).join('');
+    } catch(e) { tbody.innerHTML = '<tr><td colspan="6" class="loading">Error loading</td></tr>'; }
+}
+
+async function addDispatcher() {
+    const body = {
+        userName: document.getElementById('dispatcherName').value,
+        userEmail: document.getElementById('dispatcherEmail').value,
+        password: document.getElementById('dispatcherPassword').value,
+        phone: document.getElementById('dispatcherPhone').value,
+        role: 'DISPATCHER'
+    };
+    if (!body.userName || !body.userEmail || !body.password) { showError('dispatcherError', 'Name, email and password are required'); return; }
+    const res = await apiFetch('/api/users/staff', { method: 'POST', body: JSON.stringify(body) });
+    if (res?.ok) {
+        closeModal('addDispatcherModal');
+        clearFields(['dispatcherName','dispatcherEmail','dispatcherPassword','dispatcherPhone']);
+        loadDispatchers();
+        showToast('Dispatcher account created for ' + body.userEmail);
+    } else {
+        const e = await res?.text();
+        showError('dispatcherError', e || 'Failed to create dispatcher');
+    }
+}
+
+async function deleteDispatcher(id, name) {
+    if (!confirm(`Remove ${name} from the system?`)) return;
+    const res = await apiFetch(`/api/users/staff/${id}`, { method: 'DELETE' });
+    if (res?.ok) { loadDispatchers(); showToast(`${name} removed`); }
+    else { alert('Failed to remove dispatcher'); }
+}
+
 function showModal(id) {
     document.getElementById(id).classList.add('open');
     if (id === 'addWorkOrderModal') loadCustomersForWO();
+    if (id === 'addUserModal') {
+        document.getElementById('addUserModal').querySelector('.modal-header h3').textContent = 'Add Technician';
+        clearFields(['staffName','staffEmail','staffPassword','staffPhone']);
+        document.getElementById('staffError').style.display = 'none';
+        const roleSelect = document.getElementById('staffRole');
+        if (userRole === 'DISPATCHER') {
+            roleSelect.innerHTML = '<option value="TECHNICIAN">Technician</option>';
+        } else {
+            roleSelect.innerHTML = '<option value="TECHNICIAN">Technician</option><option value="DISPATCHER">Dispatcher</option>';
+        }
+    }
+    if (id === 'addDispatcherModal') {
+        clearFields(['dispatcherName','dispatcherEmail','dispatcherPassword','dispatcherPhone']);
+        document.getElementById('dispatcherError').style.display = 'none';
+    }
 }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
-// ── Toast notification ────────────────────────────────────────────────────
+async function loadTechDashboard() {
+    try {
+        const res = await apiFetch('/api/reports/my-summary');
+        if (!res || !res.ok) return;
+        const data = await res.json();
+        document.getElementById('statTechTotal').textContent     = data.totalAssigned ?? '-';
+        document.getElementById('statTechProgress').textContent  = data.inProgress    ?? '-';
+        document.getElementById('statTechCompleted').textContent = data.completed     ?? '-';
+        document.getElementById('statTechFeedback').textContent  = data.feedbackCount ?? '-';
+    } catch(e) {}
+
+    const tbody = document.getElementById('techWorkOrdersTable');
+    tbody.innerHTML = '<tr><td colspan="6" class="loading">Loading...</td></tr>';
+    try {
+        const res = await apiFetch('/api/work-orders/my');
+        if (!res || !res.ok) {
+            tbody.innerHTML = '<tr><td colspan="6" class="loading">Unable to load jobs</td></tr>';
+            return;
+        }
+        const data = await res.json();
+        if (!data.length) { tbody.innerHTML = '<tr><td colspan="6" class="loading">No work orders assigned to you yet</td></tr>'; return; }
+        tbody.innerHTML = data.map(w => `
+            <tr>
+                <td><strong>${w.code}</strong></td>
+                <td>${w.title}</td>
+                <td><span class="badge badge-${w.priority?.toLowerCase()}">${w.priority}</span></td>
+                <td>
+                    <span class="badge badge-${statusClass(w.status)}">${techStatusLabel(w.status)}</span>
+                </td>
+                <td>${w.customer?.companyName || '-'}</td>
+                <td><button class="btn btn-sm btn-primary" onclick="viewWorkOrder(${w.id})">View</button></td>
+            </tr>`).join('');
+    } catch(e) { tbody.innerHTML = '<tr><td colspan="6" class="loading">Error loading</td></tr>'; }
+}
+
+function openFeedbackModal(workOrderId) {
+    document.getElementById('feedbackWoId').value = workOrderId;
+    document.getElementById('feedbackRating').value = '5';
+    document.getElementById('feedbackComment').value = '';
+    document.getElementById('feedbackPhotoInput').value = '';
+    document.getElementById('feedbackPhotoPreview').style.display = 'none';
+    document.getElementById('feedbackError').style.display = 'none';
+    document.getElementById('feedbackSuccess').style.display = 'none';
+    updateStars(5);
+    showModal('feedbackModal');
+}
+
+function updateStars(val) {
+    document.getElementById('feedbackRating').value = val;
+    document.querySelectorAll('.star-btn').forEach((btn, i) => {
+        btn.style.color = i < val ? '#f59e0b' : '#ccc';
+    });
+}
+
+async function submitFeedback() {
+    const workOrderId = document.getElementById('feedbackWoId').value;
+    const rating      = parseInt(document.getElementById('feedbackRating').value);
+    const comment     = document.getElementById('feedbackComment').value;
+    const photoInput  = document.getElementById('feedbackPhotoInput');
+    let feedbackPhoto = '';
+    if (photoInput && photoInput.files && photoInput.files[0]) {
+        feedbackPhoto = await toBase64(photoInput.files[0]);
+    }
+    if (!rating || rating < 1 || rating > 5) { showError('feedbackError', 'Please select a star rating'); return; }
+    const res = await apiFetch(`/api/portal/feedback/${workOrderId}`, {
+        method: 'POST',
+        body: JSON.stringify({ rating, comment, feedbackPhoto })
+    });
+    if (res?.ok) {
+        showSuccess('feedbackSuccess', 'Feedback submitted! Thank you.');
+        setTimeout(() => { closeModal('feedbackModal'); loadPortal(); }, 1500);
+    } else {
+        showError('feedbackError', 'Failed to submit feedback. Please try again.');
+    }
+}
+
+function previewPhoto(inputId, previewId) {
+    const input   = document.getElementById(inputId);
+    const preview = document.getElementById(previewId);
+    if (!input || !input.files || !input.files[0]) return;
+    const reader = new FileReader();
+    reader.onload = e => { preview.src = e.target.result; preview.style.display = 'block'; };
+    reader.readAsDataURL(input.files[0]);
+}
+
+function toBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload  = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
 function showToast(msg) {
     let t = document.getElementById('toast');
     if (!t) {
@@ -550,28 +990,17 @@ function showToast(msg) {
         t.style.cssText = 'position:fixed;bottom:24px;right:24px;background:#1e3a5f;color:white;padding:12px 20px;border-radius:8px;font-size:14px;z-index:9999;box-shadow:0 4px 15px rgba(0,0,0,0.2);transition:opacity 0.3s';
         document.body.appendChild(t);
     }
-    t.textContent = msg;
-    t.style.opacity = '1';
+    t.textContent = msg; t.style.opacity = '1';
     clearTimeout(t._timer);
     t._timer = setTimeout(() => { t.style.opacity = '0'; }, 3000);
 }
 
-// ── Utilities ─────────────────────────────────────────────────────────────
 function showError(id, msg) { const el = document.getElementById(id); if(el){el.textContent=msg;el.style.display='block';} }
 function showSuccess(id, msg) { const el = document.getElementById(id); if(el){el.textContent=msg;el.style.display='block';} }
 function clearFields(ids) { ids.forEach(id => { const el = document.getElementById(id); if(el) el.value=''; }); }
-
-function statusClass(s) {
-    return { NEW:'new', ASSIGNED:'assigned', IN_PROGRESS:'inprogress', ON_HOLD:'onhold', COMPLETED:'completed', CLOSED:'closed', CANCELLED:'cancelled' }[s] || 'new';
-}
-function formatStatus(s) {
-    return { NEW:'New', ASSIGNED:'Assigned', IN_PROGRESS:'In Progress', ON_HOLD:'On Hold', COMPLETED:'Completed', CLOSED:'Closed', CANCELLED:'Cancelled' }[s] || s;
-}
-function formatDate(d) {
-    if (!d) return '-';
-    return new Date(d).toLocaleString('en-IN', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
-}
-function isSlaWarning(d) {
-    if (!d) return false;
-    return new Date(d) < new Date(Date.now() + 2 * 60 * 60 * 1000);
-}
+function statusClass(s) { return { NEW:'new', ASSIGNED:'assigned', IN_PROGRESS:'inprogress', ON_HOLD:'onhold', COMPLETED:'completed', CLOSED:'closed', CANCELLED:'cancelled' }[s] || 'new'; }
+function formatStatus(s) { return { NEW:'New', ASSIGNED:'Assigned', IN_PROGRESS:'In Progress', ON_HOLD:'On Hold', COMPLETED:'Completed', CLOSED:'Closed', CANCELLED:'Cancelled' }[s] || s; }
+function customerStatusLabel(s) { return { NEW:'Pending', ASSIGNED:'Technician Assigned', IN_PROGRESS:'Work in Progress', ON_HOLD:'On Hold', COMPLETED:'Completed', CLOSED:'Closed', CANCELLED:'Cancelled' }[s] || s; }
+function techStatusLabel(s) { return { NEW:'Pending', ASSIGNED:'Assigned to Me', IN_PROGRESS:'Accepted — In Progress', ON_HOLD:'On Hold', COMPLETED:'Completed', CLOSED:'Closed', CANCELLED:'Cancelled' }[s] || s; }
+function formatDate(d) { if (!d) return '-'; return new Date(d).toLocaleString('en-IN', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }); }
+function isSlaWarning(d) { if (!d) return false; return new Date(d) < new Date(Date.now() + 2 * 60 * 60 * 1000); }

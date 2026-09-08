@@ -3,6 +3,7 @@ package com.EMP_Management_COMP.ManageByHR.Entity;
 import java.time.LocalDateTime;
 
 import com.EMP_Management_COMP.ManageByHR.ENUM.WorkOrderStatus;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -26,6 +27,7 @@ public class WorkOrderStatusHistory {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "work_order_id", nullable = false)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private WorkOrder workOrder;
 
     @Enumerated(EnumType.STRING)
@@ -35,13 +37,12 @@ public class WorkOrderStatusHistory {
     @Column(nullable = false)
     private WorkOrderStatus toStatus;
 
-    private String changedBy; // userEmail
+    private String changedBy;
 
     private LocalDateTime changedAt;
 
     private String note;
 
-    // Constructors
     public WorkOrderStatusHistory() {}
 
     public WorkOrderStatusHistory(WorkOrder workOrder, WorkOrderStatus fromStatus,
@@ -54,7 +55,6 @@ public class WorkOrderStatusHistory {
         this.note = note;
     }
 
-    // Getters and Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 

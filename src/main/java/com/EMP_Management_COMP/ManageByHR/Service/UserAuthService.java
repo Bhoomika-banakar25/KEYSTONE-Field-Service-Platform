@@ -13,7 +13,12 @@ import com.EMP_Management_COMP.ManageByHR.DTO.ForgotPasswordDTO;
 import com.EMP_Management_COMP.ManageByHR.DTO.LoginRequestDTO;
 import com.EMP_Management_COMP.ManageByHR.DTO.RegisterRequestDTO;
 import com.EMP_Management_COMP.ManageByHR.DTO.ResetPasswordDTO;
+import com.EMP_Management_COMP.ManageByHR.ENUM.Role;
+import com.EMP_Management_COMP.ManageByHR.Entity.Customer;
+import com.EMP_Management_COMP.ManageByHR.Entity.Site;
 import com.EMP_Management_COMP.ManageByHR.Entity.UserAuth;
+import com.EMP_Management_COMP.ManageByHR.Repository.CustomerRepository;
+import com.EMP_Management_COMP.ManageByHR.Repository.SiteRepository;
 import com.EMP_Management_COMP.ManageByHR.Repository.UserAuthRepository;
 import com.EMP_Management_COMP.ManageByHR.Security.EmailService;
 import com.EMP_Management_COMP.ManageByHR.Security.JWTUtil;
@@ -26,6 +31,12 @@ public class UserAuthService {
 
     @Autowired
     private UserAuthRepository userAuthRepo;
+
+    @Autowired
+    private CustomerRepository customerRepo;
+
+    @Autowired
+    private SiteRepository siteRepo;
 
     @Autowired
     private JWTUtil jwtUtil;
@@ -52,9 +63,38 @@ public class UserAuthService {
         user.setUserEmail(register.userEmail);
         user.setPassword(passwordEncoder.encode(register.password));
         user.setPhone(register.phone);
-        user.setRole(register.role);
+
+        Role assignedRole = register.role != null ? register.role : Role.CUSTOMER;
+        user.setRole(assignedRole);
 
         userAuthRepo.save(user);
+
+        if (assignedRole == Role.CUSTOMER) {
+            boolean alreadyExists = customerRepo.findByEmail(register.userEmail).isPresent();
+            if (!alreadyExists) {
+                String locationStr = (register.location != null && !register.location.isBlank())
+                        ? register.location : "Address not provided";
+
+                Customer customer = new Customer();
+                customer.setCompanyName(register.userName);
+                customer.setContactPerson(register.userName);
+                customer.setEmail(register.userEmail);
+                customer.setPhone(register.phone != null ? register.phone : "");
+                customer.setAddress(locationStr);
+                customer.setActive(true);
+                customer.setCreatedAt(java.time.LocalDateTime.now());
+                Customer savedCustomer = customerRepo.save(customer);
+
+                Site site = new Site();
+                site.setName("Main Location");
+                site.setAddress(locationStr);
+                site.setContactPhone(register.phone != null ? register.phone : "");
+                site.setActive(true);
+                site.setCreatedAt(java.time.LocalDateTime.now());
+                site.setCustomer(savedCustomer);
+                siteRepo.save(site);
+            }
+        }
 
         String token = jwtUtil.generateToken(user);
         return new AuthResponseDTO(token, "Registration Successful");

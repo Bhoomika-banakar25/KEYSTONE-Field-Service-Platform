@@ -31,7 +31,8 @@ public class RoleBasedPermissions {
             Permissions.CREATE_SITE, Permissions.UPDATE_SITE, Permissions.VIEW_SITE,
             Permissions.CREATE_WORK_ORDER, Permissions.UPDATE_WORK_ORDER, Permissions.VIEW_WORK_ORDER,
             Permissions.ASSIGN_WORK_ORDER, Permissions.CANCEL_WORK_ORDER,
-            Permissions.VIEW_DASHBOARD
+            Permissions.VIEW_DASHBOARD, Permissions.VIEW_PARTS,
+            Permissions.CREATE_USER, Permissions.VIEW_USER, Permissions.DELETE_USER
         )));
 
         permission.put(Role.TECHNICIAN, new HashSet<>(Arrays.asList(
@@ -42,7 +43,7 @@ public class RoleBasedPermissions {
         )));
 
         permission.put(Role.CUSTOMER, new HashSet<>(Arrays.asList(
-            Permissions.RAISE_REQUEST, Permissions.VIEW_OWN_REQUEST
+            Permissions.RAISE_REQUEST, Permissions.VIEW_OWN_REQUEST, Permissions.VIEW_SITE
         )));
 
         permission.put(Role.ADMIN, new HashSet<>(Arrays.asList(Permissions.values())));

@@ -18,10 +18,26 @@ public class EmailService {
 
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(to);
-        message.setSubject("Reset Your Password - ManageByHR");
+        message.setSubject("Reset Your Password - KEYSTONE");
         message.setText("Click the link below to reset your password:\n\n" + resetPasswordLink
                 + "\n\nThis link is valid for 10 minutes.");
 
         javaMailSender.send(message);
+    }
+
+    public void sendWorkOrderCompletedNotification(String managerEmail, String workOrderCode,
+            String workOrderTitle, String technicianEmail) {
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setTo(managerEmail);
+            message.setSubject("[KEYSTONE] Work Order Completed: " + workOrderCode);
+            message.setText("Work order " + workOrderCode + " has been marked as COMPLETED.\n\n"
+                    + "Title: " + workOrderTitle + "\n"
+                    + "Completed by: " + technicianEmail + "\n\n"
+                    + "Please review and close the work order in KEYSTONE.");
+            javaMailSender.send(message);
+        } catch (Exception e) {
+            System.out.println("Email notification failed: " + e.getMessage());
+        }
     }
 }
