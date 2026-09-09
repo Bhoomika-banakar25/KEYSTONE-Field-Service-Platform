@@ -102,26 +102,62 @@ public class CustomerPortalController {
     @PreAuthorize("hasAnyAuthority('VIEW_OWN_REQUEST')")
     public ResponseEntity<Feedback> submitFeedback(@PathVariable Long workOrderId,
             @RequestBody Map<String, Object> body, Principal principal) {
-        WorkOrder wo = workOrderRepo.findById(workOrderId)
-                .orElseThrow(() -> new RuntimeException("Work order not found"));
+        try {
+            WorkOrder wo = workOrderRepo.findById(workOrderId)
+                    .orElseThrow(() -> new RuntimeException("Work order not found"));
 
-        Optional<Feedback> existing = feedbackRepo.findByWorkOrderId(workOrderId);
-        Feedback feedback = existing.orElse(new Feedback());
+            Optional<Feedback> existing = feedbackRepo.findByWorkOrderId(workOrderId);
+            Feedback feedback = existing.orElse(new Feedback());
 
-        feedback.setWorkOrder(wo);
-        feedback.setRating(Integer.parseInt(body.getOrDefault("rating", "5").toString()));
-        feedback.setComment(body.getOrDefault("comment", "").toString());
-        feedback.setFeedbackPhoto(body.getOrDefault("feedbackPhoto", "").toString());
-        feedback.setSubmittedAt(LocalDateTime.now());
-        feedback.setSubmittedBy(principal.getName());
+            feedback.setWorkOrder(wo);
+            feedback.setRating(Integer.parseInt(body.getOrDefault("rating", "5").toString()));
+            feedback.setComment(body.getOrDefault("comment", "").toString());
+            feedback.setFeedbackPhoto(body.getOrDefault("feedbackPhoto", "").toString());
+            feedback.setSubmittedAt(LocalDateTime.now());
+            feedback.setSubmittedBy(principal.getName());
 
-        return ResponseEntity.ok(feedbackRepo.save(feedback));
+            Feedback savedFeedback = feedbackRepo.save(feedback);
+            System.out.println("Feedback saved successfully for WO " + workOrderId + " with ID: " + savedFeedback.getId());
+            return ResponseEntity.ok(savedFeedback);
+        } catch (Exception e) {
+            System.err.println("Error saving feedback for WO " + workOrderId + ": " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).build();
+        }
     }
 
     @GetMapping("/feedback/{workOrderId}")
     @PreAuthorize("hasAnyAuthority('VIEW_OWN_REQUEST', 'VIEW_WORK_ORDER')")
     public ResponseEntity<?> getFeedback(@PathVariable Long workOrderId) {
-        return ResponseEntity.ok(feedbackRepo.findByWorkOrderId(workOrderId).orElse(null));
+        try {
+            Optional<Feedback> feedback = feedbackRepo.findByWorkOrderId(workOrderId);
+            if (feedback.isPresent()) {
+                return ResponseEntity.ok(feedback.get());
+            } else {
+                return ResponseEntity.ok(null);
+            }
+        } catch (Exception e) {
+            System.err.println("Error fetching feedback for work order " + workOrderId + ": " + e.getMessage());
+            return ResponseEntity.ok(null);
+        }
+    }
+
+    @GetMapping("/order/{workOrderId}")
+    @PreAuthorize("hasAnyAuthority('VIEW_OWN_REQUEST')")
+    public ResponseEntity<WorkOrder> getMyOrder(@PathVariable Long workOrderId, Principal principal) {
+        String email = principal.getName();
+        Customer customer = customerRepo.findByEmail(email).orElse(null);
+        if (customer == null) return ResponseEntity.status(403).build();
+        
+        WorkOrder wo = workOrderRepo.findById(workOrderId).orElse(null);
+        if (wo == null) return ResponseEntity.status(404).build();
+        
+        // Ensure customer can only see their own work order
+        if (!wo.getCustomer().getId().equals(customer.getId())) {
+            return ResponseEntity.status(403).build();
+        }
+        
+        return ResponseEntity.ok(wo);
     }
 
     @PostMapping("/add-site")

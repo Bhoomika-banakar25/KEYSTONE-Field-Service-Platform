@@ -7,7 +7,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.EMP_Management_COMP.ManageByHR.DTO.AuthResponseDTO;
 import com.EMP_Management_COMP.ManageByHR.DTO.ForgotPasswordDTO;
 import com.EMP_Management_COMP.ManageByHR.DTO.LoginRequestDTO;
 import com.EMP_Management_COMP.ManageByHR.DTO.RegisterRequestDTO;
@@ -24,8 +23,19 @@ public class UserAuthController {
     private UserAuthService userAuthService;
 
     @PostMapping("/register")
-    public ResponseEntity<AuthResponseDTO> register(@RequestBody RegisterRequestDTO register) {
-        return ResponseEntity.ok(userAuthService.register(register));
+    public ResponseEntity<?> register(@RequestBody RegisterRequestDTO register) {
+        try {
+            return ResponseEntity.ok(userAuthService.register(register));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(new ErrorResponse(e.getMessage()));
+        }
+    }
+    
+    public static class ErrorResponse {
+        public String message;
+        public ErrorResponse(String message) {
+            this.message = message;
+        }
     }
 
     @PostMapping("/login")

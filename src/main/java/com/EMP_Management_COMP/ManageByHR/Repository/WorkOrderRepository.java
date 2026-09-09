@@ -30,4 +30,6 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
     long countByStatus(WorkOrderStatus status);
 
     long countBySlaBreachedTrue();
+
+    WorkOrder findTopByOrderByIdDesc();
 }

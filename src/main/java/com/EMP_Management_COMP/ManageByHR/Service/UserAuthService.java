@@ -51,53 +51,65 @@ public class UserAuthService {
     private TokenKillingService tokenKill;
 
     public AuthResponseDTO register(RegisterRequestDTO register) {
+        try {
+            Optional<UserAuth> existingUser = userAuthRepo.findByUserEmail(register.userEmail);
 
-        Optional<UserAuth> existingUser = userAuthRepo.findByUserEmail(register.userEmail);
-
-        if (existingUser.isPresent()) {
-            throw new RuntimeException("User already exists");
-        }
-
-        UserAuth user = new UserAuth();
-        user.setUserName(register.userName);
-        user.setUserEmail(register.userEmail);
-        user.setPassword(passwordEncoder.encode(register.password));
-        user.setPhone(register.phone);
-
-        Role assignedRole = register.role != null ? register.role : Role.CUSTOMER;
-        user.setRole(assignedRole);
-
-        userAuthRepo.save(user);
-
-        if (assignedRole == Role.CUSTOMER) {
-            boolean alreadyExists = customerRepo.findByEmail(register.userEmail).isPresent();
-            if (!alreadyExists) {
-                String locationStr = (register.location != null && !register.location.isBlank())
-                        ? register.location : "Address not provided";
-
-                Customer customer = new Customer();
-                customer.setCompanyName(register.userName);
-                customer.setContactPerson(register.userName);
-                customer.setEmail(register.userEmail);
-                customer.setPhone(register.phone != null ? register.phone : "");
-                customer.setAddress(locationStr);
-                customer.setActive(true);
-                customer.setCreatedAt(java.time.LocalDateTime.now());
-                Customer savedCustomer = customerRepo.save(customer);
-
-                Site site = new Site();
-                site.setName("Main Location");
-                site.setAddress(locationStr);
-                site.setContactPhone(register.phone != null ? register.phone : "");
-                site.setActive(true);
-                site.setCreatedAt(java.time.LocalDateTime.now());
-                site.setCustomer(savedCustomer);
-                siteRepo.save(site);
+            if (existingUser.isPresent()) {
+                throw new RuntimeException("User already exists");
             }
-        }
 
-        String token = jwtUtil.generateToken(user);
-        return new AuthResponseDTO(token, "Registration Successful");
+            UserAuth user = new UserAuth();
+            user.setUserName(register.userName);
+            user.setUserEmail(register.userEmail);
+            user.setPassword(passwordEncoder.encode(register.password));
+            user.setPhone(register.phone != null ? register.phone : "");
+
+            Role assignedRole = register.role != null ? register.role : Role.CUSTOMER;
+            user.setRole(assignedRole);
+
+            userAuthRepo.save(user);
+
+            if (assignedRole == Role.CUSTOMER) {
+                try {
+                    boolean alreadyExists = customerRepo.findByEmail(register.userEmail).isPresent();
+                    if (!alreadyExists) {
+                        String companyName = (register.companyName != null && !register.companyName.isBlank())
+                                ? register.companyName : "Default Company";
+                        String locationStr = (register.location != null && !register.location.isBlank())
+                                ? register.location : "Address not provided";
+
+                        Customer customer = new Customer();
+                        customer.setCompanyName(companyName);
+                        customer.setContactPerson(register.userName);
+                        customer.setEmail(register.userEmail);
+                        customer.setPhone(register.phone != null ? register.phone : "");
+                        customer.setAddress(locationStr);
+                        customer.setActive(true);
+                        customer.setCreatedAt(java.time.LocalDateTime.now());
+                        Customer savedCustomer = customerRepo.save(customer);
+
+                        Site site = new Site();
+                        site.setName("Main Location");
+                        site.setAddress(locationStr);
+                        site.setContactPhone(register.phone != null ? register.phone : "");
+                        site.setActive(true);
+                        site.setCreatedAt(java.time.LocalDateTime.now());
+                        site.setCustomer(savedCustomer);
+                        siteRepo.save(site);
+                    }
+                } catch (Exception e) {
+                    System.err.println("Warning: Could not create customer/site: " + e.getMessage());
+                    // Continue anyway - user is registered even if customer creation fails
+                }
+            }
+
+            String token = jwtUtil.generateToken(user);
+            return new AuthResponseDTO(token, "Registration Successful");
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException("Registration failed: " + e.getMessage());
+        }
     }
 
     public String login(LoginRequestDTO login) {

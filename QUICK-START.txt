@@ -1,0 +1,128 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                   MANAGEBYR - QUICK START REFERENCE                          ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+🚀 START APPLICATION IN 5 SECONDS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Option 1 (PowerShell - Recommended):
+  cd d:\ManageByHR\ManageByHR
+  .\start-app.ps1
+
+Option 2 (Batch - Alternative):
+  cd d:\ManageByHR\ManageByHR
+  start-app.bat
+
+Option 3 (Manual Maven):
+  cd d:\ManageByHR\ManageByHR
+  mvn spring-boot:run
+
+⏳ WAIT FOR: "Tomcat started on port 9899"
+
+🌐 OPEN IN BROWSER
+━━━━━━━━━━━━━━━━━━
+
+  http://localhost:9899
+
+✅ TEST CREDENTIALS
+━━━━━━━━━━━━━━━━━
+
+Manager:
+  Email: manager@meridian.com
+  Pass: manager123
+
+Dispatcher:
+  Email: dispatcher@meridian.com
+  Pass: dispatcher123
+
+Technician:
+  Email: tech@meridian.com
+  Pass: tech123
+
+Customer:
+  Email: bharati@gmail.com
+  Pass: customer123
+
+✨ KEY FEATURES
+━━━━━━━━━━━━━━━
+
+✓ Unified login for all roles
+✓ Work order management
+✓ Real-time progress tracker (horizontal timeline)
+✓ Technician workflow
+✓ Customer feedback system
+✓ Part inventory management
+✓ Status history tracking
+
+🛑 STOP APPLICATION
+━━━━━━━━━━━━━━━━━━
+
+Press: Ctrl+C
+
+⚠️ PORT CONFLICT (FIXED!)
+━━━━━━━━━━━━━━━━━━━━━━━
+
+This error is GONE! Use the startup scripts:
+  ✓ Automatic port detection
+  ✓ Auto-cleanup of blocked port
+  ✓ Instant restart
+
+🔧 TROUBLESHOOTING
+━━━━━━━━━━━━━━━━━
+
+Login fails?
+  → Check MySQL is running (port 3306)
+  → Try different test account
+
+Can't start?
+  → Use .\start-app.ps1 (auto-cleanup)
+  → Check console for errors
+  → Verify MySQL connection
+
+Slow startup?
+  → Normal: 7-8 seconds
+  → First build takes longer
+
+📚 DOCUMENTATION
+━━━━━━━━━━━━━━━
+
+PORT-FIX-SOLUTION.md    → Technical details
+STARTUP-GUIDE.md        → Complete reference
+CHANGES-MADE.md         → What was changed
+FIX-SUMMARY.txt         → Quick summary
+
+🌐 API & DOCUMENTATION
+━━━━━━━━━━━━━━━━━━━━━
+
+Swagger UI:
+  http://localhost:9899/swagger-ui.html
+
+Database:
+  Host: localhost
+  Port: 3306
+  Database: hr_emp_management
+  User: root
+
+💡 COMMON TASKS
+━━━━━━━━━━━━━━
+
+Check application is running:
+  http://localhost:9899/
+
+Verify port is available:
+  netstat -ano | findstr "9899"
+
+Force stop application:
+  Get-Process java | Stop-Process -Force
+
+Clean rebuild:
+  mvn clean compile
+
+View logs:
+  Check console output during startup
+
+═════════════════════════════════════════════════════════════════════════════════
+
+STATUS: ✅ Production Ready - No Port Conflicts!
+
+═════════════════════════════════════════════════════════════════════════════════

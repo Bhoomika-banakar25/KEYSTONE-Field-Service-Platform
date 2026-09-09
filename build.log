@@ -1,0 +1,23 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] -----------------< com.EMP_Management_COMP:ManageByHR >-----------------
+[INFO] Building  0.0.1-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- clean:3.4.1:clean (default-clean) @ ManageByHR ---
+[INFO] Deleting D:\ManageByHR\ManageByHR\target
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ ManageByHR ---
+[INFO] Copying 3 resources from src\main\resources to target\classes
+[INFO] Copying 3 resources from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.14.1:compile (default-compile) @ ManageByHR ---
+[INFO] Recompiling the module because of changed source code.
+[INFO] Compiling 50 source files with javac [debug parameters release 17] to target\classes
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  5.686 s
+[INFO] Finished at: 2026-09-09T13:43:58+05:30
+[INFO] ------------------------------------------------------------------------

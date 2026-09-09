@@ -108,6 +108,13 @@
 							<artifactId>lombok</artifactId>
 						</exclude>
 					</excludes>
+					<!-- Port conflict resolution -->
+					<fork>true</fork>
+					<jvmArguments>
+						-Dserver.port=9899
+						-Dserver.socket.so-reuse-addr=true
+						-Dserver.tomcat.connection-timeout=20000
+					</jvmArguments>
 				</configuration>
 			</plugin>
 			<plugin>

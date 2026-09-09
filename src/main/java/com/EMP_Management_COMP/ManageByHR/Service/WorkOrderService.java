@@ -112,6 +112,7 @@ public class WorkOrderService {
                 .orElseThrow(() -> new RuntimeException("Technician not found"));
         WorkOrderStatus prev = wo.getStatus();
         wo.setAssignedTo(tech);
+        wo.setAssignedAt(LocalDateTime.now());
         wo.setStatus(WorkOrderStatus.ASSIGNED);
         wo.setUpdatedAt(LocalDateTime.now());
         workOrderRepo.save(wo);
@@ -129,8 +130,8 @@ public class WorkOrderService {
         WorkOrderStatus prev = wo.getStatus();
         wo.setStatus(toStatus);
         wo.setUpdatedAt(LocalDateTime.now());
-        workOrderRepo.save(wo);
-        historyRepo.save(new WorkOrderStatusHistory(wo, prev, toStatus, changedBy, note));
+        WorkOrder saved = workOrderRepo.save(wo);
+        historyRepo.save(new WorkOrderStatusHistory(saved, prev, toStatus, changedBy, note));
 
         if (toStatus == WorkOrderStatus.COMPLETED) {
             List<UserAuth> managers = userAuthRepo.findByRole(Role.MANAGER);
@@ -140,7 +141,7 @@ public class WorkOrderService {
             }
         }
 
-        return wo;
+        return saved;
     }
 
     private void validateTransition(WorkOrderStatus from, WorkOrderStatus to) {
@@ -207,7 +208,8 @@ public class WorkOrderService {
     }
 
     private String generateCode() {
-        long count = workOrderRepo.count() + 1;
-        return String.format("WO-%04d", count);
+        WorkOrder lastWO = workOrderRepo.findTopByOrderByIdDesc();
+        long nextNumber = (lastWO != null) ? lastWO.getId() + 1 : 1;
+        return String.format("WO-%04d", nextNumber);
     }
 }

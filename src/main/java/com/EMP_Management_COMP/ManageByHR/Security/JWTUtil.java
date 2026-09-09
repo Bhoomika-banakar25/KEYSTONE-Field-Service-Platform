@@ -39,6 +39,11 @@ public class JWTUtil {
 
         Set<Permissions> perm =
                 RoleBasedPermissions.getRoleBasedPermissions().get(user.getRole());
+        
+        // Add permissions to the token
+        if (perm != null) {
+            claims.put("Authorities", perm.stream().map(Permissions::name).toArray());
+        }
 
         Date now = new Date();
         Date expire = new Date(now.getTime() + validateTime);

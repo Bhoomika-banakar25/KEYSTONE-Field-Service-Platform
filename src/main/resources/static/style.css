@@ -110,6 +110,21 @@ body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; color: #333; }
 .error-msg { background: #ffebee; color: #c62828; padding: 10px 14px; border-radius: 6px; font-size: 13px; margin: 0 24px 10px; }
 .success-msg { background: #e8f5e9; color: #2e7d32; padding: 10px 14px; border-radius: 6px; font-size: 13px; margin: 0 24px 10px; }
 
+/* PROGRESS BAR ANIMATION */
+@keyframes progressPulse {
+    0%, 100% { opacity: 0.6; box-shadow: 0 0 8px rgba(16, 185, 129, 0.4), inset 0 0 8px rgba(16, 185, 129, 0.2); }
+    50% { opacity: 1; box-shadow: 0 0 16px rgba(16, 185, 129, 0.8), inset 0 0 12px rgba(16, 185, 129, 0.4); }
+}
+
+@keyframes progressSlide {
+    0% {
+        background-position: 0% 0%;
+    }
+    100% {
+        background-position: 100% 0%;
+    }
+}
+
 /* WO DETAIL */
 .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 20px 24px; }
 .detail-item label { font-size: 12px; color: #888; display: block; }
@@ -195,15 +210,17 @@ body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; color: #333; }
 .split-login-panel #registerHint { max-width: 340px; color: rgba(255,255,255,0.7); }
 .split-login-panel #registerHint a { color: #a78bfa; }
 .split-login-panel .register-link a { color: rgba(255,255,255,0.5); }
-.home-box { background: rgba(255,255,255,0.95); padding: 50px 60px; border-radius: 20px; width: 580px; box-shadow: 0 30px 80px rgba(0,0,0,0.6), 0 0 40px rgba(138,43,226,0.3); text-align: center; position: relative; z-index: 1; transition: all 0.4s ease; }
+.home-box { background: rgba(255,255,255,0.96); padding: 60px 70px; border-radius: 24px; width: 620px; box-shadow: 0 40px 100px rgba(0,0,0,0.7), 0 0 50px rgba(102, 126, 234, 0.4); text-align: center; position: relative; z-index: 1; transition: all 0.4s ease; }
 .home-logo { margin-bottom: 36px; }
 .home-logo h1 { font-size: 36px; color: #1a0050; font-weight: 800; letter-spacing: 2px; margin-bottom: 6px; }
 .home-subtitle { font-size: 15px; color: #6f42c1; font-weight: 600; margin-bottom: 8px; }
 .home-desc { font-size: 14px; color: #888; margin-bottom: 0; }
-.role-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 24px; }
-.role-btn { padding: 16px 20px; border: none; border-radius: 12px; cursor: pointer; font-size: 15px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 10px; transition: all 0.25s; color: white; letter-spacing: 0.3px; }
-.role-btn:hover { transform: translateY(-3px); box-shadow: 0 10px 25px rgba(0,0,0,0.3); filter: brightness(1.1); }
-.role-btn .role-icon { font-size: 20px; }
+.role-buttons { display: flex; justify-content: center; gap: 14px; margin-bottom: 32px; }
+.role-btn { padding: 18px 32px; border: none; border-radius: 14px; cursor: pointer; font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 12px; transition: all 0.3s ease; color: white; letter-spacing: 0.5px; box-shadow: 0 8px 20px rgba(0,0,0,0.15); }
+.role-btn:hover { transform: translateY(-4px); box-shadow: 0 14px 35px rgba(0,0,0,0.25); filter: brightness(1.08); }
+.role-btn:active { transform: translateY(-1px); }
+.role-btn .role-icon { font-size: 24px; }
+.role-btn.unified-login { background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%); padding: 20px 40px; font-size: 17px; min-width: 280px; }
 .role-btn.manager    { background: linear-gradient(135deg, #1a0050, #6f42c1); }
 .role-btn.dispatcher { background: linear-gradient(135deg, #0a0060, #0064ff); }
 .role-btn.technician { background: linear-gradient(135deg, #c1007a, #f46b45); }

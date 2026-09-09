@@ -1,6 +1,7 @@
 package com.EMP_Management_COMP.ManageByHR.Controller;
 
 import java.security.Principal;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.EMP_Management_COMP.ManageByHR.ENUM.Role;
 import com.EMP_Management_COMP.ManageByHR.ENUM.WorkOrderStatus;
 import com.EMP_Management_COMP.ManageByHR.Entity.UserAuth;
 import com.EMP_Management_COMP.ManageByHR.Entity.WorkOrder;
@@ -72,5 +74,47 @@ public class DashboardController {
         data.put("onHold",        onHold);
         data.put("feedbackCount", feedbackCount);
         return ResponseEntity.ok(data);
+    }
+
+    @GetMapping("/technicians-tracking")
+    @PreAuthorize("hasAnyAuthority('VIEW_DASHBOARD', 'ASSIGN_WORK_ORDER')")
+    public ResponseEntity<List<Map<String, Object>>> technicianTracking() {
+        try {
+            // Get all technicians
+            List<UserAuth> technicians = userAuthRepo.findByRole(Role.TECHNICIAN);
+            List<Map<String, Object>> result = new ArrayList<>();
+
+            for (UserAuth tech : technicians) {
+                // Get all work orders assigned to this technician
+                List<WorkOrder> jobs = workOrderRepo.findByAssignedToId(tech.getId());
+
+                // Count jobs by status
+                long assigned   = jobs.stream().filter(w -> w.getStatus() == WorkOrderStatus.ASSIGNED).count();
+                long inProgress = jobs.stream().filter(w -> w.getStatus() == WorkOrderStatus.IN_PROGRESS).count();
+                long onHold     = jobs.stream().filter(w -> w.getStatus() == WorkOrderStatus.ON_HOLD).count();
+                long completed  = jobs.stream().filter(w -> w.getStatus() == WorkOrderStatus.COMPLETED || w.getStatus() == WorkOrderStatus.CLOSED).count();
+                long total      = jobs.size();
+
+                Map<String, Object> techData = new HashMap<>();
+                techData.put("id",           tech.getId());
+                techData.put("name",         tech.getUserName());
+                techData.put("email",        tech.getUserEmail());
+                techData.put("assigned",     assigned);
+                techData.put("inProgress",   inProgress);
+                techData.put("onHold",       onHold);
+                techData.put("completed",    completed);
+                techData.put("total",        total);
+
+                result.add(techData);
+            }
+
+            // Sort by name
+            result.sort((a, b) -> ((String) a.get("name")).compareTo((String) b.get("name")));
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            System.err.println("Error fetching technician tracking: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.ok(new ArrayList<>());
+        }
     }
 }
