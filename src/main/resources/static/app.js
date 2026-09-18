@@ -1333,7 +1333,7 @@ function initializeMap() {
                 const lng = position.coords.longitude;
                 const accuracy = position.coords.accuracy;
                 
-                console.log(`Geolocation: ${lat}, ${lng} (accuracy: ${accuracy}m)`);
+                console.log(`📍 Geolocation acquired: ${lat}, ${lng} (accuracy: ${accuracy.toFixed(0)}m)`);
                 
                 // Center map on current location with good zoom
                 map.setView([lat, lng], 16);
@@ -1350,11 +1350,11 @@ function initializeMap() {
                     weight: 3,
                     opacity: 1,
                     fillOpacity: 0.8
-                }).addTo(map).bindPopup('📍 Your Live Location').openPopup();
+                }).addTo(map).bindPopup(`📍 Your Location (±${accuracy.toFixed(0)}m)`).openPopup();
                 
                 // Add accuracy circle
                 L.circle([lat, lng], {
-                    radius: accuracy,
+                    radius: Math.max(accuracy, 50),
                     color: '#2196F3',
                     fillColor: '#2196F3',
                     fillOpacity: 0.1,
@@ -1362,16 +1362,21 @@ function initializeMap() {
                     dashArray: '5, 5'
                 }).addTo(map);
                 
-                // Update location display
+                // Get precise address from coordinates
                 getAddressFromCoordinates(lat, lng);
             },
             function(error) {
-                console.log('Geolocation error:', error);
+                console.log('❌ Geolocation error:', error);
                 // If geolocation fails, show help text
                 mapContainer.innerHTML = '<div style="padding:16px;text-align:center"><p style="color:#d32f2f;margin-bottom:12px;font-weight:600">⚠️ Could not access your live location</p><p style="color:#666;font-size:13px;margin-bottom:12px">Please:</p><ul style="text-align:left;color:#666;font-size:12px;display:inline-block"><li>✓ Enable GPS/Location services on your device</li><li>✓ Refresh the page and try again</li><li>✓ Check browser location permissions</li><li>✓ Or tap on the map to select your location</li></ul></div>';
                 
                 // Default to India center with limited zoom
                 map.setView([20.5937, 78.9629], 5);
+            },
+            {
+                enableHighAccuracy: true,      // Request high accuracy GPS
+                timeout: 10000,                 // Wait up to 10 seconds
+                maximumAge: 0                   // Don't use cached position
             }
         );
     } else {
@@ -1404,8 +1409,10 @@ function initializeMap() {
 }
 
 function getAddressFromCoordinates(lat, lng) {
-    // Using Nominatim reverse geocoding with improved parameters for better accuracy
+    // Using Nominatim reverse geocoding with high zoom for precise address
     const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=en`;
+    
+    console.log(`🌍 Reverse geocoding coordinates: ${lat}, ${lng}`);
     
     fetch(url)
         .then(res => res.json())
@@ -1416,40 +1423,27 @@ function getAddressFromCoordinates(lat, lng) {
             if (data.address) {
                 const addr = data.address;
                 
-                // Log what we receive for debugging
-                console.log('Address components:', addr);
+                console.log('📍 Address components received:', addr);
                 
-                // Priority order for Indian addresses - try to get district/city
-                const village = addr.village || '';
-                const town = addr.town || '';
-                const city = addr.city || '';
-                const district = addr.county || addr.state_district || ''; // county is often district in Nominatim
-                const state = addr.state || '';
-                const postcode = addr.postcode || '';
-                
-                // Build address with proper priority
+                // For India - try to get most specific details
                 const parts = [];
                 
-                if (village && village !== city && village !== town) {
-                    parts.push(village);
-                }
-                if (town && town !== city && town !== district) {
-                    parts.push(town);
-                }
-                if (city && city !== district) {
-                    parts.push(city);
-                }
-                if (district) {
-                    parts.push(district);
-                }
-                if (state) {
-                    parts.push(state);
-                }
-                if (postcode) {
-                    parts.push(postcode);
-                }
+                // Add components in order of specificity
+                if (addr.house_number) parts.push(addr.house_number);
+                if (addr.road) parts.push(addr.road);
+                if (addr.suburb) parts.push(addr.suburb);
+                if (addr.village && !parts.includes(addr.village)) parts.push(addr.village);
+                if (addr.town && !parts.includes(addr.town)) parts.push(addr.town);
+                if (addr.city && addr.city !== addr.town && !parts.includes(addr.city)) parts.push(addr.city);
                 
-                // Remove duplicates and empty strings
+                // Add district/county
+                if (addr.county) parts.push(addr.county);
+                else if (addr.state_district) parts.push(addr.state_district);
+                
+                if (addr.state) parts.push(addr.state);
+                if (addr.postcode) parts.push(addr.postcode);
+                
+                // Build final address
                 address = [...new Set(parts.filter(p => p && p.trim()))].join(', ');
             }
             
@@ -1462,11 +1456,11 @@ function getAddressFromCoordinates(lat, lng) {
             document.getElementById('liveLocationAddress').dataset.lat = lat;
             document.getElementById('liveLocationAddress').dataset.lng = lng;
             
-            console.log('Final address resolved:', address);
+            console.log('✅ Final precise address:', address.trim());
         })
         .catch(err => {
-            console.log('Geocoding error:', err);
-            // Fallback to coordinates
+            console.log('❌ Geocoding error:', err);
+            // Fallback to coordinates with higher precision
             const fallback = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
             document.getElementById('liveLocationAddress').value = fallback;
             document.getElementById('liveLocationAddress').dataset.lat = lat;

@@ -2,9 +2,13 @@ FROM maven:3.9-eclipse-temurin-17 AS builder
 
 WORKDIR /app
 
-# Copy project files
-COPY pom.xml .
-COPY src ./src
+# Clone code from GitHub repository
+# Replace with your actual GitHub repo URL
+ARG GITHUB_REPO=https://github.com/YourUsername/ManageByHR.git
+ARG BRANCH=master
+
+RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+RUN git clone --branch ${BRANCH} ${GITHUB_REPO} .
 
 # Build application
 RUN mvn clean package -DskipTests -q

@@ -19,7 +19,13 @@ services:
 
   # Spring Boot Application
   app:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # GitHub repository details
+        GITHUB_REPO: https://github.com/Bhoomika-banakar25/KEYSTONE-Field-Service-Platform.git
+        BRANCH: master
     container_name: managebyhR_app
     environment:
       SERVER_PORT: 8080
