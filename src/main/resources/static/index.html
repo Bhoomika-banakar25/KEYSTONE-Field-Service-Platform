@@ -4,7 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>KEYSTONE — Field Service Platform</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="stylesheet" href="style.css">
+    <!-- Leaflet Map Library -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 </head>
 <body>
 
@@ -122,9 +126,23 @@
         </div>
         <div class="nav-right">
             <span id="userInfo" class="user-info"></span>
+            <button class="btn btn-outline" onclick="toggleNotificationCenter()" style="position:relative">
+                🔔 <span id="notifBadge" class="notif-badge" style="display:none">0</span>
+            </button>
             <button class="btn btn-outline" onclick="logout()">Logout</button>
         </div>
     </nav>
+
+    <!-- NOTIFICATION CENTER PANEL -->
+    <div id="notificationCenter" class="notification-center" style="display:none">
+        <div class="notification-center-header">
+            <h3>📬 Notifications</h3>
+            <button class="close-btn" onclick="toggleNotificationCenter()">✕</button>
+        </div>
+        <div class="notification-center-list" id="notificationCenterList">
+            <div style="padding:20px;text-align:center;color:#999">No notifications yet</div>
+        </div>
+    </div>
 
     
     <div id="section-dashboard" class="section active">
@@ -220,7 +238,7 @@
     
     <div id="section-portal" class="section">
         <div class="section-header">
-            <h2>My Service Requests</h2>
+            <h2>Work Orders</h2>
             <button class="btn btn-primary" onclick="showModal('raiseRequestModal')">+ Raise New Request</button>
         </div>
         <div id="portalWelcome" style="background:white;border-radius:10px;padding:20px 24px;margin-bottom:20px;box-shadow:0 2px 10px rgba(0,0,0,0.07)">
@@ -339,8 +357,29 @@
         </div>
         <div class="form-group">
             <label>Site / Location</label>
-            <select id="reqSite" onchange="toggleManualAddress(this)"><option value="">Loading your sites...</option></select>
-            <input type="text" id="reqManualAddress" placeholder="Enter your address (e.g. 123 MG Road, Bangalore)" style="display:none;margin-top:8px">
+            <div style="display:flex;gap:8px;margin-bottom:12px">
+                <button type="button" class="btn btn-sm" id="tabRegistered" style="flex:1;background:#667eea;color:white" onclick="switchLocationTab('registered')">📍 Registered Address</button>
+                <button type="button" class="btn btn-sm" id="tabLiveMap" style="flex:1;background:#e0e0e0;color:#333" onclick="switchLocationTab('liveMap')">🗺️ Live Location</button>
+            </div>
+            
+            <!-- Registered Address Tab -->
+            <div id="registeredAddressTab" style="display:block">
+                <select id="reqSite" onchange="toggleManualAddress(this)"><option value="">Loading your sites...</option></select>
+                <input type="text" id="reqManualAddress" placeholder="Enter your address (e.g. 123 MG Road, Bangalore)" style="display:none;margin-top:8px">
+            </div>
+            
+            <!-- Live Map Tab -->
+            <div id="liveMapTab" style="display:none">
+                <div style="margin-bottom:12px;display:flex;gap:8px">
+                    <button type="button" class="btn btn-sm" id="useCurrentLocBtn" style="flex:1;background:#2196F3;color:white;border:none;cursor:pointer;padding:8px;border-radius:4px" onclick="centerMapOnCurrentLocation()">📍 Use My Location</button>
+                    <button type="button" class="btn btn-sm" id="clearLocBtn" style="flex:1;background:#f44336;color:white;border:none;cursor:pointer;padding:8px;border-radius:4px" onclick="clearMapSelection()">✕ Clear Selection</button>
+                </div>
+                <div id="mapContainer" style="width:100%;height:300px;border-radius:8px;border:1px solid #ddd;margin-bottom:12px;background:#f0f0f0;position:relative">
+                    <p style="text-align:center;padding:20px;color:#888">📍 Loading your live location...</p>
+                </div>
+                <input type="text" id="liveLocationAddress" placeholder="Your location will appear here" readonly style="background:#f5f5f5;cursor:not-allowed;padding:10px">
+                <p style="font-size:12px;color:#666;margin-top:8px">🎯 <strong>Tap on the map</strong> to select your home/office location, or click "📍 Use My Location" button</p>
+            </div>
         </div>
         <div class="form-group">
             <label>Photo of Problem <span style="color:#aaa;font-size:12px">(optional)</span></label>

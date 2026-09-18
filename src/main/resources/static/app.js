@@ -3,6 +3,14 @@ let token = localStorage.getItem('token');
 let currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
 let userRole = localStorage.getItem('userRole') || '';
 
+// Map and location variables
+let map = null;
+let liveLocationMarker = null;
+let selectedLocationTab = 'registered'; // Track which location tab is active
+
+// Notification variables
+let notificationEventSource = null;
+
 // Helper functions for progress indicator colors
 function getProgressColor(status, step) {
     if (step === 'IN_PROGRESS') {
@@ -25,6 +33,7 @@ function getProgressShadow(status, step) {
 window.onload = () => {
     if (token && currentUser) {
         showDashboard();
+        subscribeToNotifications();
     } else {
         showPage('homePage');
     }
@@ -40,6 +49,333 @@ function goToLogin() {
     const panel = document.getElementById('splitLoginPanel');
     container.classList.add('split-mode');
     panel.classList.add('active');
+}
+
+function subscribeToNotifications() {
+    if (!token) return;
+    
+    // Load stored notifications first and update badge immediately
+    loadStoredNotifications();
+    
+    // Also explicitly update badge right away
+    updateNotificationBadge();
+    
+    // Close existing connection if any
+    if (notificationEventSource) {
+        notificationEventSource.close();
+    }
+    
+    // Create new SSE connection with token as query parameter
+    // Note: EventSource doesn't support custom headers, so we pass token as query param
+    notificationEventSource = new EventSource(`${API}/api/notifications/subscribe?token=${encodeURIComponent(token)}`);
+    
+    // Listen for initial connection
+    notificationEventSource.addEventListener('connect', function(event) {
+        console.log('✅ SSE connection established');
+    });
+    
+    // Listen for notifications
+    notificationEventSource.addEventListener('notification', function(event) {
+        const notifData = JSON.parse(event.data);
+        
+        console.log('📬 Notification received:', notifData);
+        
+        // Just update the badge when notification arrives
+        // Don't reload the list to avoid blinking
+        fetch(`${API}/api/notifications/unread-count`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        })
+        .then(res => res.json())
+        .then(data => {
+            const badge = document.getElementById('notifBadge');
+            if (data.unreadCount > 0) {
+                badge.textContent = data.unreadCount;
+                badge.style.display = 'inline';
+            } else {
+                badge.style.display = 'none';
+            }
+        })
+        .catch(err => console.log('Error updating badge:', err));
+        
+        // Show bottom toast
+        showBottomNotification(notifData);
+    });
+    
+    notificationEventSource.onerror = function(error) {
+        console.log('❌ Notification stream error:', error);
+        // Don't reconnect on auth failures - only on network errors
+        // Check if connection was actually lost (not 401/403 auth errors)
+        setTimeout(() => {
+            if (token && currentUser && notificationEventSource && notificationEventSource.readyState === EventSource.CLOSED) {
+                console.log('🔄 Reconnecting to notifications...');
+                subscribeToNotifications();
+            }
+        }, 5000);
+    };
+}
+
+function loadStoredNotifications() {
+    fetch(`${API}/api/notifications`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+    })
+    .then(res => res.json())
+    .then(data => {
+        const { notifications, unreadCount } = data;
+        
+        console.log('📋 Fetching notifications - Unread count:', unreadCount, 'Total:', notifications.length);
+        
+        // Update badge
+        const badge = document.getElementById('notifBadge');
+        if (unreadCount > 0) {
+            badge.textContent = unreadCount;
+            badge.style.display = 'inline';
+        } else {
+            badge.style.display = 'none';
+        }
+        
+        // Display ONLY UNREAD notifications in center
+        const list = document.getElementById('notificationCenterList');
+        const unreadNotifications = notifications.filter(n => !n.isRead);
+        
+        console.log('🔍 Showing', unreadNotifications.length, 'unread notifications');
+        
+        if (unreadNotifications && unreadNotifications.length > 0) {
+            list.innerHTML = unreadNotifications.map(n => `
+                <div class="notification-item unread" onclick="handleNotificationClick(${n.id}, ${n.workOrderId})">
+                    <div class="notification-content">
+                        <div class="notification-title">${n.title}</div>
+                        <div class="notification-message">${n.message}</div>
+                        <div class="notification-time">${formatTime(n.createdAt)}</div>
+                    </div>
+                    <button class="notification-close" onclick="closeNotification(event, ${n.id})">✕</button>
+                </div>
+            `).join('');
+        } else {
+            list.innerHTML = '<div style="padding:20px;text-align:center;color:#999">No new notifications</div>';
+        }
+    })
+    .catch(err => console.log('Error loading notifications:', err));
+}
+
+function updateNotificationBadge() {
+    // Quick function to just update the badge count without loading the full list
+    fetch(`${API}/api/notifications/unread-count`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+    })
+    .then(res => res.json())
+    .then(data => {
+        const badge = document.getElementById('notifBadge');
+        if (badge) {
+            if (data.unreadCount > 0) {
+                badge.textContent = data.unreadCount;
+                badge.style.display = 'inline';
+                console.log('🔔 Badge updated with', data.unreadCount, 'unread notifications');
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+    })
+    .catch(err => console.log('Error updating badge:', err));
+}
+
+function _loadStoredNotificationsInternal() {
+    // This function is no longer needed - removed debounce
+}
+
+function showBottomNotification(notifData) {
+    const { title, message, workOrderId, type } = notifData;
+    
+    // Create notification element
+    const notifElement = document.createElement('div');
+    notifElement.className = 'notification-toast-bottom';
+    notifElement.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        left: 20px;
+        background: white;
+        border-left: 4px solid #667eea;
+        border-radius: 8px;
+        padding: 16px 20px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 10000;
+        cursor: pointer;
+        max-width: 350px;
+        animation: slideUpIn 0.3s ease-out;
+    `;
+    
+    // Add color based on type
+    if (type === 'COMPLETED') {
+        notifElement.style.borderLeftColor = '#10b981';
+    } else if (type === 'ASSIGNED') {
+        notifElement.style.borderLeftColor = '#3b82f6';
+    }
+    
+    notifElement.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:start;gap:12px">
+            <div style="flex:1">
+                <div style="font-weight: 600; color: #1f2937">${title}</div>
+                <div style="color: #6b7280; font-size: 13px;margin-top:4px">${message}</div>
+                <div style="font-size: 11px; color: #9ca3af; margin-top: 8px">Click to view</div>
+            </div>
+            <button onclick="this.parentElement.parentElement.remove()" style="background:none;border:none;color:#999;cursor:pointer;font-size:18px">✕</button>
+        </div>
+    `;
+    
+    // Click handler
+    notifElement.style.cursor = 'pointer';
+    notifElement.onclick = (e) => {
+        if (e.target.tagName !== 'BUTTON') {
+            handleNotificationClick(null, workOrderId);
+            notifElement.remove();
+        }
+    };
+    
+    document.body.appendChild(notifElement);
+    
+    // Auto-remove after 10 seconds
+    setTimeout(() => {
+        if (notifElement.parentElement) {
+            notifElement.style.animation = 'slideDownOut 0.3s ease-out forwards';
+            setTimeout(() => notifElement.remove(), 300);
+        }
+    }, 10000);
+}
+
+function handleNotificationClick(notifId, workOrderId) {
+    if (notifId) {
+        // Mark as read
+        fetch(`${API}/api/notifications/${notifId}/read`, {
+            method: 'PUT',
+            headers: { 'Authorization': `Bearer ${token}` }
+        }).then(() => loadStoredNotifications());
+    }
+    
+    // Close notification center
+    const center = document.getElementById('notificationCenter');
+    if (center.style.display !== 'none') {
+        toggleNotificationCenter();
+    }
+    
+    // Show role-specific message
+    let message = '';
+    if (userRole === 'CUSTOMER') {
+        message = `Service Request ${workOrderId} updated - You can view the details in your requests list.`;
+    } else if (userRole === 'TECHNICIAN') {
+        message = `Work Order ${workOrderId} assigned to you - Please see the Work Orders tab for full details and instructions.`;
+    } else if (userRole === 'DISPATCHER') {
+        message = `Work Order ${workOrderId} - Please navigate to the Work Orders tab to review and assign this task.`;
+    } else {
+        // MANAGER/ADMIN
+        message = `Work Order ${workOrderId} - Please see the Work Orders tab for full details and management options.`;
+    }
+    
+    alert(message);
+}
+
+function closeNotification(event, notifId) {
+    event.stopPropagation();
+    
+    fetch(`${API}/api/notifications/${notifId}/read`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}` }
+    }).then(() => loadStoredNotifications());
+}
+
+function toggleNotificationCenter() {
+    const center = document.getElementById('notificationCenter');
+    if (center.style.display === 'none') {
+        center.style.display = 'block';
+        loadStoredNotifications();
+    } else {
+        center.style.display = 'none';
+    }
+}
+
+function formatTime(dateString) {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    
+    return date.toLocaleDateString();
+}
+
+function showNotificationToast(notifData) {
+    const { title, message, workOrderId, type } = notifData;
+    
+    // Create notification element
+    const notifElement = document.createElement('div');
+    notifElement.className = 'notification-popup';
+    notifElement.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: white;
+        border-left: 4px solid #667eea;
+        border-radius: 8px;
+        padding: 16px 20px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 10000;
+        cursor: pointer;
+        max-width: 350px;
+        animation: slideIn 0.3s ease-out;
+    `;
+    
+    // Add color based on type
+    if (type === 'COMPLETED') {
+        notifElement.style.borderLeftColor = '#10b981';
+    } else if (type === 'ASSIGNED') {
+        notifElement.style.borderLeftColor = '#3b82f6';
+    }
+    
+    notifElement.innerHTML = `
+        <div style="font-weight: 600; color: #1f2937; margin-bottom: 4px">${title}</div>
+        <div style="color: #6b7280; font-size: 13px">${message}</div>
+        <div style="font-size: 11px; color: #9ca3af; margin-top: 8px">Click to view</div>
+    `;
+    
+    // Click handler - redirect or highlight
+    notifElement.onclick = () => {
+        if (type === 'REQUEST_CREATED') {
+            // Redirect to dashboard and show work orders
+            showDashboard();
+            setTimeout(() => {
+                document.querySelector('[onclick="showTab(\'workOrders\')"]')?.click();
+                highlightWorkOrder(workOrderId);
+            }, 500);
+        } else if (type === 'ASSIGNED' || type === 'COMPLETED') {
+            // Show dashboard and highlight the work order
+            showDashboard();
+            setTimeout(() => {
+                document.querySelector('[onclick="showTab(\'workOrders\')"]')?.click();
+                highlightWorkOrder(workOrderId);
+            }, 500);
+        }
+        
+        // Remove notification
+        notifElement.style.animation = 'slideOut 0.3s ease-out forwards';
+        setTimeout(() => notifElement.remove(), 300);
+    };
+    
+    // Auto-remove after 8 seconds
+    document.body.appendChild(notifElement);
+    setTimeout(() => {
+        if (notifElement.parentElement) {
+            notifElement.style.animation = 'slideOut 0.3s ease-out forwards';
+            setTimeout(() => notifElement.remove(), 300);
+        }
+    }, 8000);
+}
+
+function highlightWorkOrder(workOrderId) {
+    // Auto-scroll and highlighting removed - notification click handler shows alert instead
 }
 
 function closeSplit() {
@@ -120,6 +456,11 @@ function logout() {
     fetch(`${API}/api/user_auth/logout`, { method: 'POST', headers: authHeader() });
     token = null; currentUser = null; userRole = '';
     localStorage.clear();
+    
+    // Clear all error messages before showing home page
+    document.getElementById('loginError').style.display = 'none';
+    document.getElementById('registerError').style.display = 'none';
+    
     showPage('homePage');
 }
 
@@ -127,8 +468,14 @@ function showPage(id) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.getElementById(id).classList.add('active');
 }
-function showLogin() { showPage('loginPage'); }
-function showRegister() { showPage('registerPage'); }
+function showLogin() { 
+    showPage('loginPage'); 
+    document.getElementById('loginError').style.display = 'none';
+}
+function showRegister() { 
+    showPage('registerPage');
+    document.getElementById('registerError').style.display = 'none';
+}
 
 function showDashboard() {
     showPage('dashboardPage');
@@ -166,20 +513,21 @@ function applyRoleVisibility() {
 }
 
 function showSection(name, el) {
+    console.log(`🔄 showSection called: ${name}`);
     document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
     document.getElementById('section-' + name).classList.add('active');
     if (el) el.classList.add('active');
 
-    if (name === 'dashboard')      loadDashboard();
-    if (name === 'customers')      loadCustomers();
-    if (name === 'workorders')     loadWorkOrders();
-    if (name === 'parts')          loadParts();
-    if (name === 'portal')         loadPortal();
-    if (name === 'users')          loadUsers();
-    if (name === 'dispatchers')    loadDispatchers();
-    if (name === 'technician-tracking') loadTechnicianTracking();
-    if (name === 'tech-dashboard') loadTechDashboard();
+    if (name === 'dashboard')      { console.log('Loading dashboard...'); loadDashboard(); }
+    if (name === 'customers')      { console.log('Loading customers...'); loadCustomers(); }
+    if (name === 'workorders')     { console.log('Loading workorders...'); loadWorkOrders(); }
+    if (name === 'parts')          { console.log('Loading parts...'); loadParts(); }
+    if (name === 'portal')         { console.log('Loading portal...'); loadPortal(); }
+    if (name === 'users')          { console.log('Loading users...'); loadUsers(); }
+    if (name === 'dispatchers')    { console.log('Loading dispatchers...'); loadDispatchers(); }
+    if (name === 'technician-tracking') { console.log('Loading tech tracking...'); loadTechnicianTracking(); }
+    if (name === 'tech-dashboard') { console.log('Loading tech dashboard...'); loadTechDashboard(); }
 }
 
 function authHeader() {
@@ -274,7 +622,17 @@ async function loadWorkOrders() {
         const data = await res.json();
         if (!data.length) { tbody.innerHTML = '<tr><td colspan="7" class="loading">No work orders found</td></tr>'; return; }
         
-        tbody.innerHTML = data.map(w => `
+        tbody.innerHTML = data.map(w => {
+            let actionButton = '';
+            if (w.assignedTo) {
+                // Already assigned - show assigned user
+                actionButton = `<button class="btn btn-sm btn-success" style="background:#28a745;cursor:default;color:#fff;border:none" disabled>✓ ${w.assignedTo.userName}</button>`;
+            } else if (['MANAGER','ADMIN','DISPATCHER'].includes(userRole) && w.status !== 'CLOSED' && w.status !== 'CANCELLED') {
+                // Not assigned and user can assign - show assign button
+                actionButton = `<button class="btn btn-sm btn-warning" onclick="openAssignModal(${w.id})">👷 Assign</button>`;
+            }
+            
+            return `
             <tr>
                 <td><strong>${w.code}</strong></td>
                 <td>${w.title}</td>
@@ -287,9 +645,10 @@ async function loadWorkOrders() {
                 <td style="font-size:12px">${w.assignedTo && w.assignedAt ? formatDate(w.assignedAt) : (w.createdAt ? formatDate(w.createdAt) : '-')}</td>
                 <td style="display:flex;gap:6px;flex-wrap:wrap">
                     <button class="btn btn-sm btn-primary" onclick="viewWorkOrder(${w.id})">View</button>
-                    ${w.assignedTo ? `<button class="btn btn-sm btn-success" style="background:#28a745;cursor:default;color:#fff;border:none" disabled>✓ ${w.assignedTo.userName}</button>` : ((['MANAGER','ADMIN','DISPATCHER'].includes(userRole) && w.status !== 'CLOSED' && w.status !== 'CANCELLED') ? `<button class="btn btn-sm btn-warning" onclick="openAssignModal(${w.id})">👷 Assign</button>` : '')}
+                    ${actionButton}
                 </td>
-            </tr>`).join('');
+            </tr>`;
+        }).join('');
     } catch(e) { tbody.innerHTML = '<tr><td colspan="7" class="loading">Error loading</td></tr>'; }
 }
 
@@ -320,6 +679,7 @@ async function addWorkOrder() {
 }
 
 async function viewWorkOrder(id) {
+    console.log(`👁️ viewWorkOrder called for ID: ${id}`);
     try {
         // Determine which endpoint to call based on user role
         const endpoint = userRole === 'CUSTOMER' ? `/api/portal/order/${id}` : `/api/work-orders/${id}`;
@@ -329,9 +689,8 @@ async function viewWorkOrder(id) {
             console.error('Failed to load work order. Status:', woRes?.status);
             return;
         }
-        const wo = await apiFetch(endpoint);
-        if (!wo || !wo.ok) return;
-        const wo_data = await wo.json();
+        const wo_data = await woRes.json();
+        console.log(`✅ Work order loaded:`, wo_data);
         
         const histRes = await apiFetch(`/api/work-orders/${id}/history`).catch(() => null);
         
@@ -866,6 +1225,309 @@ function toggleManualAddress(sel) {
     manualInput.style.display = (sel.value === 'new' || sel.value === '') ? 'block' : 'none';
 }
 
+function switchLocationTab(tab) {
+    selectedLocationTab = tab;
+    
+    // Update button styles
+    const btnRegistered = document.getElementById('tabRegistered');
+    const btnLiveMap = document.getElementById('tabLiveMap');
+    
+    if (tab === 'registered') {
+        btnRegistered.style.background = '#667eea';
+        btnRegistered.style.color = 'white';
+        btnLiveMap.style.background = '#e0e0e0';
+        btnLiveMap.style.color = '#333';
+        
+        document.getElementById('registeredAddressTab').style.display = 'block';
+        document.getElementById('liveMapTab').style.display = 'none';
+    } else {
+        btnRegistered.style.background = '#e0e0e0';
+        btnRegistered.style.color = '#333';
+        btnLiveMap.style.background = '#667eea';
+        btnLiveMap.style.color = 'white';
+        
+        document.getElementById('registeredAddressTab').style.display = 'none';
+        document.getElementById('liveMapTab').style.display = 'block';
+        
+        // Initialize map if not already done
+        setTimeout(() => initializeMap(), 300);
+    }
+}
+
+function centerMapOnCurrentLocation() {
+    // If accuracy is poor (> 50km), ask user to manually select location
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            function(position) {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                const accuracy = position.coords.accuracy;
+                
+                if (accuracy > 50000) {
+                    showToast('⚠️ GPS accuracy is poor. Please tap on the map to select your exact location.');
+                    return;
+                }
+                
+                // Center map on current location
+                if (map) {
+                    map.setView([lat, lng], 16);
+                }
+                
+                // Add marker
+                if (liveLocationMarker && liveLocationMarker.setRadius) {
+                    map.removeLayer(liveLocationMarker);
+                }
+                
+                liveLocationMarker = L.circleMarker([lat, lng], {
+                    radius: 8,
+                    fillColor: '#2196F3',
+                    color: '#fff',
+                    weight: 3,
+                    opacity: 1,
+                    fillOpacity: 0.8
+                }).addTo(map).bindPopup('📍 Your Live Location').openPopup();
+                
+                getAddressFromCoordinates(lat, lng);
+            },
+            function(error) {
+                showToast('Could not get location. Please tap on map to select location.');
+            }
+        );
+    }
+}
+
+function clearMapSelection() {
+    if (liveLocationMarker) {
+        map.removeLayer(liveLocationMarker);
+        liveLocationMarker = null;
+    }
+    document.getElementById('liveLocationAddress').value = '';
+    document.getElementById('liveLocationAddress').dataset.lat = '';
+    document.getElementById('liveLocationAddress').dataset.lng = '';
+    showToast('Location cleared. Tap on map to select again.');
+}
+
+function initializeMap() {
+    if (map !== null) return; // Already initialized
+    
+    const mapContainer = document.getElementById('mapContainer');
+    if (!mapContainer) return;
+    
+    // Show loading state
+    mapContainer.innerHTML = '<div style="padding:20px;text-align:center"><p style="color:#667eea;font-weight:600">📍 Getting your live location...</p><p style="color:#999;font-size:12px;margin-top:8px">This may take a few seconds</p></div>';
+    
+    // Initialize map centered on India
+    map = L.map('mapContainer').setView([20.5937, 78.9629], 5);
+    
+    // Add OpenStreetMap tiles
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 19
+    }).addTo(map);
+    
+    // Get user's current location with high accuracy
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            function(position) {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                const accuracy = position.coords.accuracy;
+                
+                console.log(`Geolocation: ${lat}, ${lng} (accuracy: ${accuracy}m)`);
+                
+                // Center map on current location with good zoom
+                map.setView([lat, lng], 16);
+                
+                // Add blue circle marker for current location (like Google Maps)
+                if (liveLocationMarker) {
+                    map.removeLayer(liveLocationMarker);
+                }
+                
+                liveLocationMarker = L.circleMarker([lat, lng], {
+                    radius: 8,
+                    fillColor: '#2196F3',
+                    color: '#fff',
+                    weight: 3,
+                    opacity: 1,
+                    fillOpacity: 0.8
+                }).addTo(map).bindPopup('📍 Your Live Location').openPopup();
+                
+                // Add accuracy circle
+                L.circle([lat, lng], {
+                    radius: accuracy,
+                    color: '#2196F3',
+                    fillColor: '#2196F3',
+                    fillOpacity: 0.1,
+                    weight: 1,
+                    dashArray: '5, 5'
+                }).addTo(map);
+                
+                // Update location display
+                getAddressFromCoordinates(lat, lng);
+            },
+            function(error) {
+                console.log('Geolocation error:', error);
+                // If geolocation fails, show help text
+                mapContainer.innerHTML = '<div style="padding:16px;text-align:center"><p style="color:#d32f2f;margin-bottom:12px;font-weight:600">⚠️ Could not access your live location</p><p style="color:#666;font-size:13px;margin-bottom:12px">Please:</p><ul style="text-align:left;color:#666;font-size:12px;display:inline-block"><li>✓ Enable GPS/Location services on your device</li><li>✓ Refresh the page and try again</li><li>✓ Check browser location permissions</li><li>✓ Or tap on the map to select your location</li></ul></div>';
+                
+                // Default to India center with limited zoom
+                map.setView([20.5937, 78.9629], 5);
+            }
+        );
+    } else {
+        mapContainer.innerHTML = '<p style="text-align:center;padding:20px;color:#d32f2f">⚠️ Your browser does not support live location</p>';
+    }
+    
+    // Handle map clicks to select specific location (home, office, etc.)
+    map.on('click', function(e) {
+        const lat = e.latlng.lat;
+        const lng = e.latlng.lng;
+        
+        // Remove old marker
+        if (liveLocationMarker && liveLocationMarker.setRadius === undefined) {
+            map.removeLayer(liveLocationMarker);
+        }
+        
+        // Add green marker for selected location
+        liveLocationMarker = L.marker([lat, lng], {
+            icon: L.icon({
+                iconUrl: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgdmlld0JveD0iMCAwIDI0IDI0Ij48cGF0aCBmaWxsPSIjNDJhNWY0IiBkPSJNMTIgMEE4IDggMCAwIDAgNCA4YzAgNC40MSAzLjA1IDguNzQgNyAxNWM0LjItNi4yOSA3LTEwLjU5IDctMTVhOCA4IDAgMCAwLTgtOHptMCA1YTMgMyAwIDEgMSAwIDYgMyAzIDAgMCAxIDAtNnoiLz48L3N2Zz4=',
+                iconSize: [40, 40],
+                iconAnchor: [20, 40],
+                popupAnchor: [0, -35]
+            })
+        }).addTo(map).bindPopup('📌 Location Selected').openPopup();
+        
+        // Get address for this location
+        getAddressFromCoordinates(lat, lng);
+    });
+}
+
+function getAddressFromCoordinates(lat, lng) {
+    // Using Nominatim reverse geocoding with improved parameters for better accuracy
+    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=en`;
+    
+    fetch(url)
+        .then(res => res.json())
+        .then(data => {
+            let address = '';
+            
+            // Try to build address from components
+            if (data.address) {
+                const addr = data.address;
+                
+                // Log what we receive for debugging
+                console.log('Address components:', addr);
+                
+                // Priority order for Indian addresses - try to get district/city
+                const village = addr.village || '';
+                const town = addr.town || '';
+                const city = addr.city || '';
+                const district = addr.county || addr.state_district || ''; // county is often district in Nominatim
+                const state = addr.state || '';
+                const postcode = addr.postcode || '';
+                
+                // Build address with proper priority
+                const parts = [];
+                
+                if (village && village !== city && village !== town) {
+                    parts.push(village);
+                }
+                if (town && town !== city && town !== district) {
+                    parts.push(town);
+                }
+                if (city && city !== district) {
+                    parts.push(city);
+                }
+                if (district) {
+                    parts.push(district);
+                }
+                if (state) {
+                    parts.push(state);
+                }
+                if (postcode) {
+                    parts.push(postcode);
+                }
+                
+                // Remove duplicates and empty strings
+                address = [...new Set(parts.filter(p => p && p.trim()))].join(', ');
+            }
+            
+            // Fallback to display_name if address components don't work
+            if (!address || address.trim().length < 5) {
+                address = data.display_name || `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+            }
+            
+            document.getElementById('liveLocationAddress').value = address.trim();
+            document.getElementById('liveLocationAddress').dataset.lat = lat;
+            document.getElementById('liveLocationAddress').dataset.lng = lng;
+            
+            console.log('Final address resolved:', address);
+        })
+        .catch(err => {
+            console.log('Geocoding error:', err);
+            // Fallback to coordinates
+            const fallback = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+            document.getElementById('liveLocationAddress').value = fallback;
+            document.getElementById('liveLocationAddress').dataset.lat = lat;
+            document.getElementById('liveLocationAddress').dataset.lng = lng;
+        });
+}
+
+function searchLocation() {
+    const searchBox = document.getElementById('locationSearchBox');
+    const query = searchBox.value.trim();
+    
+    if (!query) return;
+    
+    // Use Nominatim forward geocoding to find the location
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&countrycodes=in`;
+    
+    fetch(url)
+        .then(res => res.json())
+        .then(data => {
+            if (data && data.length > 0) {
+                const result = data[0];
+                const lat = parseFloat(result.lat);
+                const lng = parseFloat(result.lon);
+                
+                // Center map on found location
+                if (map) {
+                    map.setView([lat, lng], 14);
+                }
+                
+                // Remove old marker and add new one
+                if (liveLocationMarker) {
+                    map.removeLayer(liveLocationMarker);
+                }
+                
+                liveLocationMarker = L.marker([lat, lng], {
+                    icon: L.icon({
+                        iconUrl: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiIgdmlld0JveD0iMCAwIDI0IDI0Ij48cGF0aCBmaWxsPSIjMjE0YzAwIiBkPSJNMTIgMEE4IDggMCAwIDAgNCA4YzAgNC40MSAzLjA1IDguNzQgNyAxNWM0LjItNi4yOSA3LTEwLjU5IDctMTVhOCA4IDAgMCAwLTgtOHptMCA1YTMgMyAwIDEgMSAwIDYgMyAzIDAgMCAxIDAtNnoiLz48L3N2Zz4=',
+                        iconSize: [32, 32],
+                        iconAnchor: [16, 32]
+                    })
+                }).addTo(map).bindPopup(`📍 ${result.display_name}`);
+                
+                // Update address
+                getAddressFromCoordinates(lat, lng);
+                showToast(`Found: ${result.display_name}`);
+            } else {
+                showToast('Location not found. Please check the spelling.');
+            }
+        })
+        .catch(err => {
+            console.log('Search error:', err);
+            showToast('Could not search location. Please try again.');
+        });
+}
+
+function toggleManualAddress(sel) {
+    const manualInput = document.getElementById('reqManualAddress');
+    if (!manualInput) return;
+    manualInput.style.display = (sel.value === 'new' || sel.value === '') ? 'block' : 'none';
+}
+
 async function raiseRequest() {
     const photoInput = document.getElementById('reqPhoto');
     let problemPhoto = '';
@@ -873,18 +1535,48 @@ async function raiseRequest() {
         problemPhoto = await toBase64(photoInput.files[0]);
     }
 
-    let siteId = document.getElementById('reqSite').value;
-    const manualAddress = document.getElementById('reqManualAddress')?.value?.trim();
+    let siteId = null;
+    let addressToUse = null;
 
-    if (siteId === 'new' || siteId === '') {
-        if (!manualAddress) { showError('reqError', 'Please enter your address'); return; }
+    // Handle location based on selected tab
+    if (selectedLocationTab === 'registered') {
+        // Using registered address
+        siteId = document.getElementById('reqSite').value;
+        const manualAddress = document.getElementById('reqManualAddress')?.value?.trim();
+
+        if (siteId === 'new' || siteId === '') {
+            if (!manualAddress) { showError('reqError', 'Please enter your address'); return; }
+            const siteRes = await apiFetch('/api/portal/add-site', {
+                method: 'POST',
+                body: JSON.stringify({ name: 'Main Location', address: manualAddress })
+            });
+            if (!siteRes || !siteRes.ok) { showError('reqError', 'Failed to save your address. Try again.'); return; }
+            const newSite = await siteRes.json();
+            siteId = newSite.id;
+        }
+    } else if (selectedLocationTab === 'liveMap') {
+        // Using live location from map
+        addressToUse = document.getElementById('liveLocationAddress')?.value?.trim();
+        if (!addressToUse) { showError('reqError', 'Please select a location on the map'); return; }
+        
+        // Create a temporary site for the live location
+        const lat = document.getElementById('liveLocationAddress').dataset.lat;
+        const lng = document.getElementById('liveLocationAddress').dataset.lng;
         const siteRes = await apiFetch('/api/portal/add-site', {
             method: 'POST',
-            body: JSON.stringify({ name: 'Main Location', address: manualAddress })
+            body: JSON.stringify({ 
+                name: 'Live Location', 
+                address: addressToUse,
+                latitude: lat,
+                longitude: lng
+            })
         });
-        if (!siteRes || !siteRes.ok) { showError('reqError', 'Failed to save your address. Try again.'); return; }
+        if (!siteRes || !siteRes.ok) { showError('reqError', 'Failed to save your location. Try again.'); return; }
         const newSite = await siteRes.json();
         siteId = newSite.id;
+    } else {
+        showError('reqError', 'Please select a location'); 
+        return;
     }
 
     const body = {
@@ -901,6 +1593,12 @@ async function raiseRequest() {
         clearFields(['reqTitle','reqDesc']);
         if (photoInput) photoInput.value = '';
         document.getElementById('reqPhotoPreview').style.display = 'none';
+        
+        // Reset map
+        map = null;
+        liveLocationMarker = null;
+        selectedLocationTab = 'registered';
+        
         loadPortal();
         showToast('Request submitted successfully!');
     } else {

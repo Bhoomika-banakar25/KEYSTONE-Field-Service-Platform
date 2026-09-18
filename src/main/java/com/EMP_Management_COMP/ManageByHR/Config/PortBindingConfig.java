@@ -1,20 +1,24 @@
 package com.EMP_Management_COMP.ManageByHR.Config;
 
-import org.springframework.context.annotation.Configuration;
 import java.net.ServerSocket;
 
+import org.springframework.context.annotation.Configuration;
+
 /**
- * Aggressive port binding configuration to prevent port 9899 conflicts.
- * This ensures the port is available and socket reuse is enabled.
+ * Permanent port binding solution with automatic fallback.
+ * - Primary port: 9899
+ * - Fallback ports: 9800, 9801, 9802, 9803, 9804
+ * - Automatically finds an available port and applies socket reuse configuration
  */
 @Configuration
 public class PortBindingConfig {
 
-    private static final int TARGET_PORT = 9899;
-    private static final String PORT_NAME = "ManageByHR";
+    private static final int PRIMARY_PORT = 9899;
+    private static final int[] FALLBACK_PORTS = {9800, 9801, 9802, 9803, 9804};
+    private static int ACTIVE_PORT = PRIMARY_PORT;
 
     static {
-        // AGGRESSIVE: Static initialization block runs FIRST, before Spring context
+        // Static initialization runs FIRST, before Spring context
         initializePortBinding();
     }
 
@@ -23,29 +27,55 @@ public class PortBindingConfig {
         System.out.println("║        PORT BINDING CONFIGURATION - INITIALIZING         ║");
         System.out.println("╚════════════════════════════════════════════════════════════╝\n");
 
-        // Verify port is available
-        verifyPortAvailable();
+        // Find an available port (try primary first, then fallbacks)
+        findAvailablePort();
 
         // Configure socket reuse at JVM level
         configureSocketReuse();
 
-        System.out.println("✓ Port binding configuration complete\n");
+        System.out.println("✓ Port binding configuration complete");
+        System.out.println("✓ Application will run on port: " + ACTIVE_PORT + "\n");
     }
 
-    private static void verifyPortAvailable() {
-        try (ServerSocket socket = new ServerSocket(TARGET_PORT)) {
+    private static void findAvailablePort() {
+        // Try primary port first
+        if (isPortAvailable(PRIMARY_PORT)) {
+            ACTIVE_PORT = PRIMARY_PORT;
+            System.out.println("✓ Port " + PRIMARY_PORT + " is available");
+            return;
+        }
+
+        System.out.println("✗ Port " + PRIMARY_PORT + " is NOT available");
+        System.out.println("  Trying fallback ports...");
+
+        // Try fallback ports
+        for (int port : FALLBACK_PORTS) {
+            if (isPortAvailable(port)) {
+                ACTIVE_PORT = port;
+                System.out.println("✓ Port " + port + " is available - using as fallback");
+                return;
+            } else {
+                System.out.println("  ✗ Port " + port + " is busy");
+            }
+        }
+
+        // If we reach here, no ports are available
+        System.err.println("\n✗ FATAL: No ports available (9899, 9800-9804)!");
+        System.err.println("  Run: .\\cleanup-port.ps1");
+        System.err.println("  Then restart the application");
+        throw new RuntimeException("No available ports (9899, 9800-9804 are all in use)");
+    }
+
+    private static boolean isPortAvailable(int port) {
+        try (ServerSocket socket = new ServerSocket(port)) {
             socket.setReuseAddress(true);
-            System.out.println("✓ Port " + TARGET_PORT + " is available");
+            return true;
         } catch (Exception e) {
-            System.err.println("✗ FATAL: Port " + TARGET_PORT + " is NOT available!");
-            System.err.println("  Error: " + e.getMessage());
-            System.err.println("  Kill the blocking process and restart.");
-            throw new RuntimeException("Port " + TARGET_PORT + " is in use", e);
+            return false;
         }
     }
 
     private static void configureSocketReuse() {
-        // Maximum aggressive socket reuse configuration
         String[][] properties = {
             // Socket reuse
             {"server.socket.so-reuse-addr", "true"},
@@ -72,4 +102,7 @@ public class PortBindingConfig {
         }
     }
 
+    public static int getActivePort() {
+        return ACTIVE_PORT;
+    }
 }

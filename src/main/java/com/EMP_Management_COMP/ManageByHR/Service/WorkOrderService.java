@@ -38,6 +38,7 @@ public class WorkOrderService {
     @Autowired private PartUsageRepository partUsageRepo;
     @Autowired private TimeLogRepository timeLogRepo;
     @Autowired private EmailService emailService;
+    @Autowired private NotificationService notificationService;
 
     @Transactional
     public WorkOrder createWorkOrder(Long customerId, Long siteId, String title,
@@ -57,6 +58,26 @@ public class WorkOrderService {
         wo.setCode(generateCode());
         WorkOrder saved = workOrderRepo.save(wo);
         historyRepo.save(new WorkOrderStatusHistory(saved, null, WorkOrderStatus.NEW, createdBy, "Work order created"));
+        
+        // Send notifications to Manager and Dispatcher
+        List<UserAuth> managers = userAuthRepo.findByRole(Role.MANAGER);
+        List<UserAuth> dispatchers = userAuthRepo.findByRole(Role.DISPATCHER);
+        
+        // Get first manager and dispatcher for notification service
+        UserAuth manager = managers.isEmpty() ? null : managers.get(0);
+        UserAuth dispatcher = dispatchers.isEmpty() ? null : dispatchers.get(0);
+        
+        // Call notification service to send both DB and real-time notifications
+        notificationService.notifyRequestCreated(saved, manager, dispatcher);
+        
+        // Also notify all other managers and dispatchers
+        for (int i = 1; i < managers.size(); i++) {
+            notificationService.notifyRequestCreated(saved, managers.get(i), null);
+        }
+        for (int i = 1; i < dispatchers.size(); i++) {
+            notificationService.notifyRequestCreated(saved, null, dispatchers.get(i));
+        }
+        
         return saved;
     }
 
@@ -118,6 +139,14 @@ public class WorkOrderService {
         workOrderRepo.save(wo);
         historyRepo.save(new WorkOrderStatusHistory(wo, prev, WorkOrderStatus.ASSIGNED,
                 assignedBy, "Assigned to " + tech.getUserEmail()));
+        
+        // Send notifications to Customer and Technician
+        UserAuth customer = wo.getCustomer() != null ? 
+            userAuthRepo.findByUserEmailAndRole(wo.getCustomer().getEmail(), Role.CUSTOMER).orElse(null) : null;
+        
+        // Call notification service to send both DB and real-time notifications
+        notificationService.notifyTechnicianAssigned(wo, customer, tech);
+        
         return wo;
     }
 
@@ -135,9 +164,29 @@ public class WorkOrderService {
 
         if (toStatus == WorkOrderStatus.COMPLETED) {
             List<UserAuth> managers = userAuthRepo.findByRole(Role.MANAGER);
-            for (UserAuth manager : managers) {
+            List<UserAuth> dispatchers = userAuthRepo.findByRole(Role.DISPATCHER);
+            UserAuth customer = wo.getCustomer() != null ? 
+                userAuthRepo.findByUserEmailAndRole(wo.getCustomer().getEmail(), Role.CUSTOMER).orElse(null) : null;
+
+            // Get first manager and dispatcher for notification service
+            UserAuth manager = managers.isEmpty() ? null : managers.get(0);
+            UserAuth dispatcher = dispatchers.isEmpty() ? null : dispatchers.get(0);
+            
+            // Call notification service to send both DB and real-time notifications
+            notificationService.notifyWorkCompleted(saved, customer, manager, dispatcher);
+            
+            // Also notify all other managers and dispatchers
+            for (int i = 1; i < managers.size(); i++) {
+                notificationService.notifyWorkCompleted(saved, null, managers.get(i), null);
+            }
+            for (int i = 1; i < dispatchers.size(); i++) {
+                notificationService.notifyWorkCompleted(saved, null, null, dispatchers.get(i));
+            }
+            
+            // Send emails to managers
+            for (UserAuth manager_email : managers) {
                 emailService.sendWorkOrderCompletedNotification(
-                        manager.getUserEmail(), wo.getCode(), wo.getTitle(), changedBy);
+                        manager_email.getUserEmail(), saved.getCode(), saved.getTitle(), changedBy);
             }
         }
 
