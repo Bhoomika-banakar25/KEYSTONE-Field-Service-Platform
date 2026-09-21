@@ -7,6 +7,7 @@ let userRole = localStorage.getItem('userRole') || '';
 let map = null;
 let liveLocationMarker = null;
 let selectedLocationTab = 'registered'; // Track which location tab is active
+let watchPositionId = null; // For continuous location tracking
 
 // Notification variables
 let notificationEventSource = null;
@@ -1307,14 +1308,122 @@ function clearMapSelection() {
     showToast('Location cleared. Tap on map to select again.');
 }
 
+function useCurrentLocation() {
+    // Get user's current GPS location and set it in the form
+    if (!navigator.geolocation) {
+        showToast('⚠️ Your browser does not support location services.');
+        return;
+    }
+    
+    showToast('📍 Getting your current location...');
+    
+    navigator.geolocation.getCurrentPosition(
+        function(position) {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            
+            // Center map on current location
+            if (map) {
+                map.setView([lat, lng], 16);
+            }
+            
+            // Remove old marker if it exists
+            if (liveLocationMarker) {
+                map.removeLayer(liveLocationMarker);
+            }
+            
+            // Add blue circle marker for current location (like Google Maps)
+            liveLocationMarker = L.circleMarker([lat, lng], {
+                radius: 8,
+                fillColor: '#2196F3',
+                color: '#fff',
+                weight: 3,
+                opacity: 1,
+                fillOpacity: 0.8
+            }).addTo(map).bindPopup('📍 Your Current Location').openPopup();
+            
+            // Get address from coordinates
+            getAddressFromCoordinates(lat, lng);
+            showToast('✅ Current location set!');
+        },
+        function(error) {
+            showToast('⚠️ Could not access your location. Please check GPS permissions or tap on the map to select manually.');
+            console.log('Geolocation error:', error);
+        },
+        {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
+        }
+    );
+}
+
+function openGoogleMapsForSelection() {
+    // Get current location first
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            function(position) {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                // Open Google Maps for selection
+                // Note: User will manually select location in Google Maps
+                const googleMapsUrl = `https://maps.google.com/?q=${lat},${lng}`;
+                
+                // Store the tab for reference
+                window.geoLocationForSelection = true;
+                
+                // Show instruction
+                showToast('📌 Select your location on Google Maps, then copy the coordinates from the URL and paste them back here.');
+                
+                // Open Google Maps
+                window.open(googleMapsUrl, 'google_maps');
+            },
+            function(error) {
+                showToast('⚠️ Could not get your current location. Please check GPS permissions.');
+            }
+        );
+    } else {
+        // Fallback: open Google Maps centered on India
+        const googleMapsUrl = 'https://maps.google.com/?q=20.5937,78.9629&z=5';
+        showToast('📌 Open Google Maps, find your location, and come back to enter the address.');
+        window.open(googleMapsUrl, 'google_maps');
+    }
+}
+
+function setLocationFromGoogle() {
+    // This function helps user manually enter address from Google Maps
+    const address = prompt('📍 Enter the location address from Google Maps (or paste the full address):', '');
+    
+    if (address && address.trim()) {
+        document.getElementById('liveLocationAddress').value = address.trim();
+        showToast('✅ Location updated!');
+    }
+}
+
 function initializeMap() {
     if (map !== null) return; // Already initialized
     
     const mapContainer = document.getElementById('mapContainer');
     if (!mapContainer) return;
     
-    // Show loading state
-    mapContainer.innerHTML = '<div style="padding:20px;text-align:center"><p style="color:#667eea;font-weight:600">📍 Getting your live location...</p><p style="color:#999;font-size:12px;margin-top:8px">This may take a few seconds</p></div>';
+    // Show loading state with Google Maps button
+    mapContainer.innerHTML = `
+        <div style="padding:20px;text-align:center">
+            <p style="color:#667eea;font-weight:600">📍 Getting your live location...</p>
+            <p style="color:#999;font-size:12px;margin-top:8px">This may take a few seconds</p>
+            <button onclick="openGoogleMapsLiveLocation()" style="
+                margin-top:12px;
+                padding:10px 16px;
+                background:#ea4335;
+                color:white;
+                border:none;
+                border-radius:4px;
+                cursor:pointer;
+                font-weight:600;
+                font-size:13px;
+            ">🗺️ Open in Google Maps</button>
+        </div>
+    `;
     
     // Initialize map centered on India
     map = L.map('mapContainer').setView([20.5937, 78.9629], 5);
@@ -1325,24 +1434,26 @@ function initializeMap() {
         maxZoom: 19
     }).addTo(map);
     
-    // Get user's current location with high accuracy
+    // Get user's current location with high accuracy AND TRACK CONTINUOUSLY
     if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
+        // Use watchPosition instead of getCurrentPosition for continuous tracking
+        watchPositionId = navigator.geolocation.watchPosition(
             function(position) {
                 const lat = position.coords.latitude;
                 const lng = position.coords.longitude;
                 const accuracy = position.coords.accuracy;
                 
-                console.log(`📍 Geolocation acquired: ${lat}, ${lng} (accuracy: ${accuracy.toFixed(0)}m)`);
+                console.log(`📍 Live Location: ${lat}, ${lng} (accuracy: ${accuracy.toFixed(0)}m)`);
                 
                 // Center map on current location with good zoom
                 map.setView([lat, lng], 16);
                 
-                // Add blue circle marker for current location (like Google Maps)
+                // Remove old marker
                 if (liveLocationMarker) {
                     map.removeLayer(liveLocationMarker);
                 }
                 
+                // Add blue circle marker for current location (like Google Maps)
                 liveLocationMarker = L.circleMarker([lat, lng], {
                     radius: 8,
                     fillColor: '#2196F3',

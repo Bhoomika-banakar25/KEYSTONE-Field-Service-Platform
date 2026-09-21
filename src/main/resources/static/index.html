@@ -370,15 +370,15 @@
             
             <!-- Live Map Tab -->
             <div id="liveMapTab" style="display:none">
-                <div style="margin-bottom:12px;display:flex;gap:8px">
-                    <button type="button" class="btn btn-sm" id="useCurrentLocBtn" style="flex:1;background:#2196F3;color:white;border:none;cursor:pointer;padding:8px;border-radius:4px" onclick="centerMapOnCurrentLocation()">📍 Use My Location</button>
-                    <button type="button" class="btn btn-sm" id="clearLocBtn" style="flex:1;background:#f44336;color:white;border:none;cursor:pointer;padding:8px;border-radius:4px" onclick="clearMapSelection()">✕ Clear Selection</button>
+                <div id="mapContainer" style="width:100%;height:350px;border-radius:8px;border:2px solid #667eea;margin-bottom:12px;background:#f0f0f0;position:relative">
+                    <p style="text-align:center;padding:20px;color:#888">📍 Loading map...</p>
                 </div>
-                <div id="mapContainer" style="width:100%;height:300px;border-radius:8px;border:1px solid #ddd;margin-bottom:12px;background:#f0f0f0;position:relative">
-                    <p style="text-align:center;padding:20px;color:#888">📍 Loading your live location...</p>
+                <div style="display:flex;gap:8px;margin-bottom:12px">
+                    <button type="button" class="btn btn-sm" style="flex:1;background:#2196F3;color:white;border:none;cursor:pointer;padding:10px;border-radius:4px;font-weight:600" onclick="useCurrentLocation()">📍 Use My Current Location</button>
+                    <button type="button" class="btn btn-sm" style="flex:1;background:#ff9800;color:white;border:none;cursor:pointer;padding:10px;border-radius:4px;font-weight:600" onclick="openGoogleMapsForSelection()">🗺️ Open Google Maps</button>
                 </div>
-                <input type="text" id="liveLocationAddress" placeholder="Your location will appear here" readonly style="background:#f5f5f5;cursor:not-allowed;padding:10px">
-                <p style="font-size:12px;color:#666;margin-top:8px">🎯 <strong>Tap on the map</strong> to select your home/office location, or click "📍 Use My Location" button</p>
+                <input type="text" id="liveLocationAddress" placeholder="Selected location will appear here" readonly style="background:#f5f5f5;cursor:not-allowed;padding:10px;width:100%;border:1px solid #ddd;border-radius:4px;font-weight:500">
+                <p style="font-size:12px;color:#666;margin-top:8px">💡 <strong>Click on the map</strong> to select your location, or use the buttons above</p>
             </div>
         </div>
         <div class="form-group">
