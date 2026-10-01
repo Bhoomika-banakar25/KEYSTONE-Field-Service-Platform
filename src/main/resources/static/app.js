@@ -838,7 +838,7 @@ function showTechnicianWorkOrderView(id, wo, history, feedback) {
                     </div>
                     <div style="display:grid;gap:10px">
                         ${techStatusButtons}
-                        <button class="btn btn-sm" style="width:100%;padding:12px;background:linear-gradient(135deg, #f59e0b 0%, #f97316 100%);color:white;border:none;border-radius:8px;font-weight:600;cursor:pointer;transition:all 0.3s" onclick="openFeedbackModal(${id})" onmouseover="this.style.transform='translateY(-2px);this.style.boxShadow='0 6px 16px rgba(245, 158, 11, 0.3)'" onmouseout="this.style.transform='translateY(0)';this.style.boxShadow='none'">⭐ View Customer Feedback</button>
+                        <button class="btn btn-sm" style="width:100%;padding:12px;background:linear-gradient(135deg, #f59e0b 0%, #f97316 100%);color:white;border:none;border-radius:8px;font-weight:600;cursor:pointer;transition:all 0.3s" onclick="openFeedbackModal(${id})" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 6px 16px rgba(245, 158, 11, 0.3)'" onmouseout="this.style.transform='translateY(0)';this.style.boxShadow='none'">⭐ View Customer Feedback</button>
                     </div>
                 </div>
 
@@ -1018,7 +1018,7 @@ function showStandardWorkOrderView(id, wo, history, feedback) {
             ${wo.problemPhoto ? `<div class="detail-item" style="grid-column:1/-1"><label>📷 Problem Photo (Reported by Customer)</label><br><img src="${wo.problemPhoto}" style="max-width:100%;max-height:300px;border-radius:8px;margin-top:8px;border:1px solid #ddd"></div>` : ''}
             ${wo.completionPhoto ? `<div class="detail-item" style="grid-column:1/-1"><label>✓ Work Completed By 👷 ${wo.assignedTo?.userName || 'Technician'}</label><br><img src="${wo.completionPhoto}" style="max-width:100%;max-height:300px;border-radius:8px;margin-top:8px;border:2px solid #4caf50"></div>` : ''}
         </div>
-        ${transitions.length ? `<div class="transition-buttons"><strong style="font-size:13px;color:#555;margin-right:8px">Change Status:</strong>${transitions.map(t => `<button class="btn btn-sm ${t.cls}" onclick="transition(${id},'${t.status}')">${t.label}</button>`).join('')}</div>` : ''}
+        ${transitions.length ? `<div class="transition-buttons"><strong style="font-size:13px;color:#555;margin-right:8px">Change Status:</strong>${transitions.map(t => `<button class="btn btn-sm ${t.cls}" onclick="transition(${id},&quot;${t.status}&quot;)">${t.label}</button>`).join('')}</div>` : ''}
         ${feedback && feedback.length > 0 ? `
         <div style="padding:16px 24px;border-top:1px solid #f0f0f0;background:#f9fff9;border-radius:0 0 8px 8px">
             <h4 style="color:#2e7d32;margin-bottom:15px">⭐ Customer Feedback (${feedback.length})</h4>
