@@ -629,8 +629,8 @@ async function loadWorkOrders() {
                 // Already assigned - show assigned user
                 actionButton = `<button class="btn btn-sm btn-success" style="background:#28a745;cursor:default;color:#fff;border:none" disabled>✓ ${w.assignedTo.userName}</button>`;
             } else if (['MANAGER','ADMIN','DISPATCHER'].includes(userRole) && w.status !== 'CLOSED' && w.status !== 'CANCELLED') {
-                // Not assigned and user can assign - show assign button
-                actionButton = `<button class="btn btn-sm btn-warning" onclick="openAssignModal(${w.id})">👷 Assign</button>`;
+                // Not assigned and user can assign - show assign button (enable clicking)
+                actionButton = `<button class="btn btn-sm btn-warning" onclick="openAssignModal(${w.id})" style="cursor:pointer;border:none;padding:8px 12px" type="button">👷 Assign</button>`;
             }
             
             return `
@@ -1445,6 +1445,9 @@ function initializeMap() {
                 
                 console.log(`📍 Live Location: ${lat}, ${lng} (accuracy: ${accuracy.toFixed(0)}m)`);
                 
+                // Only update map if it's already initialized
+                if (map === null) return;
+                
                 // Center map on current location with good zoom
                 map.setView([lat, lng], 16);
                 
@@ -2065,6 +2068,12 @@ function isSlaWarning(d) { if (!d) return false; return new Date(d) < new Date(D
 
 
 async function openAssignModal(workOrderId) {
+    // Check permissions first
+    if (!['MANAGER','ADMIN','DISPATCHER'].includes(userRole)) {
+        showToast('⚠️ Only Managers/Admins/Dispatchers can assign technicians');
+        return;
+    }
+    
     document.getElementById('assignModalWoId').value = workOrderId;
     document.getElementById('assignModalError').style.display = 'none';
     
