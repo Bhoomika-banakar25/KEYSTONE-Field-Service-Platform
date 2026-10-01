@@ -744,22 +744,22 @@ function showTechnicianWorkOrderView(id, wo, history, feedback) {
         techStatusButtons = `
             <div style="background:linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);border:2px solid #3b82f6;border-radius:10px;padding:14px;margin-bottom:12px">
                 <p style="color:#1e40af;font-weight:700;margin:0 0 12px 0;font-size:13px">🔧 Ready to Start?</p>
-                <button style="width:100%;padding:12px;background:linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px;transition:all 0.3s;box-shadow:0 4px 12px rgba(59, 130, 246, 0.3)" onclick="transitionTechWorkflow(${id}, 'IN_PROGRESS', 'Accepted and starting work')" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 6px 16px rgba(59, 130, 246, 0.4)'" onmouseout="this.style.transform='translateY(0)'">✓ Accept & Start Work</button>
+                <button style="width:100%;padding:12px;background:linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px;transition:all 0.3s;box-shadow:0 4px 12px rgba(59, 130, 246, 0.3)" onclick="transitionTechWorkflow(${id}, &quot;IN_PROGRESS&quot;, &quot;Accepted and starting work&quot;)" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 6px 16px rgba(59, 130, 246, 0.4)'" onmouseout="this.style.transform='translateY(0)'">✓ Accept & Start Work</button>
             </div>`;
     } else if (wo.status === 'IN_PROGRESS') {
         techStatusButtons = `
             <div style="background:linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);border:2px solid #f59e0b;border-radius:10px;padding:14px;margin-bottom:12px">
                 <p style="color:#92400e;font-weight:700;margin:0 0 12px 0;font-size:13px">⏳ Work in Progress</p>
                 <div style="display:flex;gap:8px;flex-wrap:wrap">
-                    <button style="flex:1;padding:12px;background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%);color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px;transition:all 0.3s" onclick="transitionTechWorkflow(${id}, 'ON_HOLD', 'Work on hold')" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">⏸ Hold</button>
-                    <button style="flex:1;padding:12px;background:linear-gradient(135deg, #10b981 0%, #059669 100%);color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px;transition:all 0.3s" onclick="transitionTechWorkflow(${id}, 'COMPLETED', 'Work completed')" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">✓ Complete</button>
+                    <button style="flex:1;padding:12px;background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%);color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px;transition:all 0.3s" onclick="transitionTechWorkflow(${id}, &quot;ON_HOLD&quot;, &quot;Work on hold&quot;)" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">⏸ Hold</button>
+                    <button style="flex:1;padding:12px;background:linear-gradient(135deg, #10b981 0%, #059669 100%);color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px;transition:all 0.3s" onclick="transitionTechWorkflow(${id}, &quot;COMPLETED&quot;, &quot;Work completed&quot;)" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">✓ Complete</button>
                 </div>
             </div>`;
     } else if (wo.status === 'ON_HOLD') {
         techStatusButtons = `
             <div style="background:linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%);border:2px solid #a855f7;border-radius:10px;padding:14px;margin-bottom:12px">
                 <p style="color:#6b21a8;font-weight:700;margin:0 0 12px 0;font-size:13px">⏸ On Hold</p>
-                <button style="width:100%;padding:12px;background:linear-gradient(135deg, #a855f7 0%, #9333ea 100%);color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px;transition:all 0.3s" onclick="transitionTechWorkflow(${id}, 'IN_PROGRESS', 'Resuming work')" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">▶ Resume Work</button>
+                <button style="width:100%;padding:12px;background:linear-gradient(135deg, #a855f7 0%, #9333ea 100%);color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px;transition:all 0.3s" onclick="transitionTechWorkflow(${id}, &quot;IN_PROGRESS&quot;, &quot;Resuming work&quot;)" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">▶ Resume Work</button>
             </div>`;
     } else if (wo.status === 'COMPLETED') {
         techStatusButtons = `
