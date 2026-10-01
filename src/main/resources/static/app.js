@@ -31,6 +31,14 @@ function getProgressShadow(status, step) {
     return '#d1d5db';
 }
 
+// Helper function to safely escape HTML special characters
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 window.onload = () => {
     if (token && currentUser) {
         showDashboard();
@@ -718,14 +726,20 @@ async function viewWorkOrder(id) {
         const isTech = userRole === 'TECHNICIAN' && wo_data.assignedTo?.userEmail === currentUser?.email;
         const isCustomer = userRole === 'CUSTOMER';
         
+        console.log(`🔍 Routing check: userRole=${userRole}, isTech=${isTech}, isCustomer=${isCustomer}`);
+        console.log(`🔍 Assigned to: ${wo_data.assignedTo?.userEmail}, Current user: ${currentUser?.email}`);
+        
         if (isTech) {
             // SPECIALIZED TECHNICIAN VIEW
+            console.log('📱 Calling showTechnicianWorkOrderView');
             showTechnicianWorkOrderView(id, wo_data, history, feedback);
         } else if (isCustomer) {
             // CUSTOMER VIEW
+            console.log('🏢 Calling showCustomerWorkOrderView');
             showCustomerWorkOrderView(id, wo_data, history, feedback);
         } else {
             // STANDARD VIEW (Manager, Dispatcher)
+            console.log('👨‍💼 Calling showStandardWorkOrderView');
             showStandardWorkOrderView(id, wo_data, history, feedback);
         }
     } catch(e) {
@@ -734,6 +748,7 @@ async function viewWorkOrder(id) {
 }
 
 function showTechnicianWorkOrderView(id, wo, history, feedback) {
+    console.log(`✨ showTechnicianWorkOrderView STARTED for WO #${id}`);
     const canLogWork = true;
     const customer = wo.customer || {};
     const site = wo.site || {};
@@ -780,21 +795,21 @@ function showTechnicianWorkOrderView(id, wo, history, feedback) {
                         <div style="font-size:32px">🏢</div>
                         <div>
                             <p style="font-size:12px;opacity:0.9;margin:0">Customer Details</p>
-                            <h3 style="margin:4px 0 0 0;font-size:18px">${customer.companyName || 'Not specified'}</h3>
+                            <h3 style="margin:4px 0 0 0;font-size:18px">${escapeHtml(customer.companyName || 'Not specified')}</h3>
                         </div>
                     </div>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px">
                         <div style="background:rgba(255,255,255,0.15);border-radius:8px;padding:12px">
                             <p style="margin:0 0 6px 0;opacity:0.8;font-size:11px">Phone</p>
-                            <p style="margin:0;font-weight:600">${customer.phone || '—'}</p>
+                            <p style="margin:0;font-weight:600">${escapeHtml(customer.phone || '—')}</p>
                         </div>
                         <div style="background:rgba(255,255,255,0.15);border-radius:8px;padding:12px">
                             <p style="margin:0 0 6px 0;opacity:0.8;font-size:11px">Email</p>
-                            <p style="margin:0;font-weight:600">${customer.email || '—'}</p>
+                            <p style="margin:0;font-weight:600">${escapeHtml(customer.email || '—')}</p>
                         </div>
                         <div style="grid-column:1/-1;background:rgba(255,255,255,0.15);border-radius:8px;padding:12px">
                             <p style="margin:0 0 6px 0;opacity:0.8;font-size:11px">📍 Location</p>
-                            <p style="margin:0;font-weight:600">${site.address || site.name || '—'}</p>
+                            <p style="margin:0;font-weight:600">${escapeHtml(site.address || site.name || '—')}</p>
                         </div>
                     </div>
                 </div>
@@ -816,11 +831,11 @@ function showTechnicianWorkOrderView(id, wo, history, feedback) {
                         </div>
                         <div>
                             <span style="color:#667eea;font-size:11px;font-weight:700;text-transform:uppercase">Issue Title</span>
-                            <p style="margin:6px 0 0 0;color:#333;font-weight:600">${wo.title}</p>
+                            <p style="margin:6px 0 0 0;color:#333;font-weight:600">${escapeHtml(wo.title)}</p>
                         </div>
                         <div>
                             <span style="color:#667eea;font-size:11px;font-weight:700;text-transform:uppercase">Description</span>
-                            <p style="margin:6px 0 0 0;color:#555;font-size:12px;line-height:1.5">${wo.description || 'No description provided'}</p>
+                            <p style="margin:6px 0 0 0;color:#555;font-size:12px;line-height:1.5">${escapeHtml(wo.description) || 'No description provided'}</p>
                         </div>
                         ${wo.problemPhoto ? `<div style="margin-top:12px"><img src="${wo.problemPhoto}" style="max-width:100%;height:auto;border-radius:10px;border:2px solid #667eea;box-shadow:0 4px 12px rgba(102, 126, 234, 0.15)"></div>` : ''}
                         ${wo.completionPhoto ? `<div style="margin-top:12px;background:#f0fdf4;border-radius:10px;padding:12px;border-left:4px solid #10b981"><p style="color:#047857;font-size:11px;font-weight:700;margin:0 0 8px 0">✓ Work Completed By 👷 ${wo.assignedTo?.userName || 'Technician'}</p><img src="${wo.completionPhoto}" style="max-width:100%;height:auto;border-radius:8px;border:2px solid #10b981"></div>` : ''}
@@ -887,7 +902,7 @@ function showTechnicianWorkOrderView(id, wo, history, feedback) {
                         ${feedback.map((f, i) => `
                         <div style="border-bottom:${i < feedback.length - 1 ? '1px solid rgba(16, 185, 129, 0.2)' : 'none'};padding-bottom:${i < feedback.length - 1 ? '10px' : '0'};margin-bottom:${i < feedback.length - 1 ? '10px' : '0'};font-size:12px">
                             <div style="color:#f59e0b;font-size:14px;letter-spacing:2px;margin-bottom:6px">${'★'.repeat(f.rating)}${'☆'.repeat(5 - f.rating)}</div>
-                            <p style="margin:0;color:#1f2937;line-height:1.5">${f.comment || 'No comment provided'}</p>
+                            <p style="margin:0;color:#1f2937;line-height:1.5">${escapeHtml(f.comment || 'No comment provided')}</p>
                         </div>
                         `).join('')}
                     </div>` : `<div style="background:linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);border:2px dashed #d1d5db;border-radius:10px;padding:14px;text-align:center;margin-top:16px"><p style="color:#6b7280;font-size:12px;margin:0">No feedback yet</p></div>`}
@@ -896,11 +911,13 @@ function showTechnicianWorkOrderView(id, wo, history, feedback) {
         </div>`;
 
     showModal('woDetailModal');
+    console.log(`✨ showTechnicianWorkOrderView COMPLETED - showModal called`);
     if (wo.status === 'IN_PROGRESS') loadPartsDropdown();
 }
 
 
 function showCustomerWorkOrderView(id, wo, history, feedback) {
+    console.log(`✨ showCustomerWorkOrderView STARTED for WO #${id}`);
     const customer = wo.customer || {};
     const site = wo.site || {};
     const assignedTech = wo.assignedTo || null;
@@ -917,11 +934,11 @@ function showCustomerWorkOrderView(id, wo, history, feedback) {
                         <h4 style="margin:0;color:#1e3a5f;font-size:14px;font-weight:700">Work Details</h4>
                     </div>
                     <div style="font-size:12px;color:#555;line-height:1.7">
-                        <p style="margin:0 0 10px 0"><strong>Priority:</strong> <span class="badge badge-${wo.priority?.toLowerCase()}">${wo.priority}</span></p>
+                        <p style="margin:0 0 10px 0"><strong>Priority:</strong> <span class="badge badge-${wo.priority?.toLowerCase()}">${escapeHtml(wo.priority)}</span></p>
                         <p style="margin:0 0 10px 0"><strong>Status:</strong> <span class="badge badge-${statusClass(wo.status)}">${formatStatus(wo.status)}</span></p>
-                        <p style="margin:0 0 10px 0"><strong>Location:</strong> ${site.name || '—'}</p>
+                        <p style="margin:0 0 10px 0"><strong>Location:</strong> ${escapeHtml(site.name || '—')}</p>
                         <p style="margin:0 0 8px 0"><strong>Description:</strong></p>
-                        <p style="margin:4px 0 0 0;color:#666;background:#f9f9f9;padding:8px;border-radius:4px;border-left:3px solid #667eea;font-size:11px;line-height:1.4">${wo.description || '—'}</p>
+                        <p style="margin:4px 0 0 0;color:#666;background:#f9f9f9;padding:8px;border-radius:4px;border-left:3px solid #667eea;font-size:11px;line-height:1.4">${escapeHtml(wo.description || '—')}</p>
                         ${wo.problemPhoto ? `<div style="margin-top:10px"><img src="${wo.problemPhoto}" style="max-width:100%;height:auto;border-radius:8px;border:2px solid #667eea;max-height:150px;object-fit:cover"></div>` : ''}
                         ${wo.completionPhoto ? `<div style="margin-top:10px;background:#f0fdf4;border-left:3px solid #10b981;border-radius:4px;padding:8px"><p style="margin:0 0 6px 0;color:#047857;font-size:10px;font-weight:700">✓ Work Completed By 👷 ${wo.assignedTo?.userName || 'Technician'}</p><img src="${wo.completionPhoto}" style="max-width:100%;height:auto;border-radius:6px;border:2px solid #10b981;max-height:150px;object-fit:cover"></div>` : ''}
                     </div>
@@ -936,9 +953,9 @@ function showCustomerWorkOrderView(id, wo, history, feedback) {
                     ${assignedTech ? `
                         <div style="background:white;border-radius:6px;padding:10px;font-size:11px">
                             <p style="margin:0 0 4px 0;color:#666"><strong>Name:</strong></p>
-                            <p style="margin:0 0 8px 0;font-weight:600;color:#1b5e20">${assignedTech.userName}</p>
+                            <p style="margin:0 0 8px 0;font-weight:600;color:#1b5e20">${escapeHtml(assignedTech.userName)}</p>
                             <p style="margin:0 0 4px 0;color:#666"><strong>Email:</strong></p>
-                            <p style="margin:0;font-weight:600;color:#1b5e20;word-break:break-all">${assignedTech.userEmail}</p>
+                            <p style="margin:0;font-weight:600;color:#1b5e20;word-break:break-all">${escapeHtml(assignedTech.userEmail)}</p>
                         </div>
                     ` : `<p style="color:#666;text-align:center;padding:12px;font-size:12px">Not assigned</p>`}
                 </div>
@@ -989,7 +1006,7 @@ function showCustomerWorkOrderView(id, wo, history, feedback) {
                     ${feedback && feedback.length > 0 ? feedback.map((f, i) => `
                     <div style="border-top:${i > 0 ? '1px solid rgba(16, 185, 129, 0.2)' : 'none'};padding-top:${i > 0 ? '10px' : '0'};margin-top:${i > 0 ? '10px' : '0'};font-size:11px">
                         <div style="color:#f59e0b;font-size:13px;letter-spacing:0.5px;margin-bottom:6px">${'★'.repeat(f.rating)}${'☆'.repeat(5-f.rating)}</div>
-                        <p style="margin:0 0 6px 0;color:#1f2937;line-height:1.5;font-size:11px;word-wrap:break-word">${f.comment || '(No comment)'}</p>
+                        <p style="margin:0 0 6px 0;color:#1f2937;line-height:1.5;font-size:11px;word-wrap:break-word">${escapeHtml(f.comment || '(No comment)')}</p>
                         ${f.feedbackPhoto ? `<img src="${f.feedbackPhoto}" style="max-width:100%;max-height:100px;border-radius:4px;margin-top:6px;object-fit:cover;border:1px solid rgba(16, 185, 129, 0.3)">` : ''}
                     </div>
                     `).join('') : `<p style="color:#059669;font-size:12px;font-style:italic;margin:0">No feedback submitted yet</p>`}
@@ -998,6 +1015,7 @@ function showCustomerWorkOrderView(id, wo, history, feedback) {
         </div>`;
 
     showModal('woDetailModal');
+    console.log(`✨ showCustomerWorkOrderView COMPLETED - showModal called`);
 }
 
 function showStandardWorkOrderView(id, wo, history, feedback) {
@@ -1009,12 +1027,12 @@ function showStandardWorkOrderView(id, wo, history, feedback) {
     document.getElementById('woDetailContent').innerHTML = `
         <div class="detail-grid">
             <div class="detail-item"><label>Status</label><span class="badge badge-${statusClass(wo.status)}">${formatStatus(wo.status)}</span></div>
-            <div class="detail-item"><label>Priority</label><span class="badge badge-${wo.priority?.toLowerCase()}">${wo.priority}</span></div>
-            <div class="detail-item"><label>Customer</label><span>${wo.customer?.contactPerson || '-'}</span></div>
-            <div class="detail-item"><label>Site</label><span>${wo.site?.name || '-'}</span></div>
-            <div class="detail-item"><label>Assigned To</label><span>${wo.assignedTo?.userName || '— Not assigned —'}</span></div>
+            <div class="detail-item"><label>Priority</label><span class="badge badge-${wo.priority?.toLowerCase()}">${escapeHtml(wo.priority)}</span></div>
+            <div class="detail-item"><label>Customer</label><span>${escapeHtml(wo.customer?.contactPerson || '-')}</span></div>
+            <div class="detail-item"><label>Site</label><span>${escapeHtml(wo.site?.name || '-')}</span></div>
+            <div class="detail-item"><label>Assigned To</label><span>${escapeHtml(wo.assignedTo?.userName || '— Not assigned —')}</span></div>
             <div class="detail-item"><label>Created</label><span>${wo.createdAt ? formatDate(wo.createdAt) : '-'}</span></div>
-            <div class="detail-item" style="grid-column:1/-1"><label>Description</label><span>${wo.description || '—'}</span></div>
+            <div class="detail-item" style="grid-column:1/-1"><label>Description</label><span>${escapeHtml(wo.description || '—')}</span></div>
             ${wo.problemPhoto ? `<div class="detail-item" style="grid-column:1/-1"><label>📷 Problem Photo (Reported by Customer)</label><br><img src="${wo.problemPhoto}" style="max-width:100%;max-height:300px;border-radius:8px;margin-top:8px;border:1px solid #ddd"></div>` : ''}
             ${wo.completionPhoto ? `<div class="detail-item" style="grid-column:1/-1"><label>✓ Work Completed By 👷 ${wo.assignedTo?.userName || 'Technician'}</label><br><img src="${wo.completionPhoto}" style="max-width:100%;max-height:300px;border-radius:8px;margin-top:8px;border:2px solid #4caf50"></div>` : ''}
         </div>
@@ -1025,7 +1043,7 @@ function showStandardWorkOrderView(id, wo, history, feedback) {
             ${feedback.map((f, i) => `
             <div style="margin-bottom:${i < feedback.length - 1 ? '15px;padding-bottom:15px;border-bottom:1px solid #e0e0e0' : '0'}">
                 <div style="display:flex;gap:6px;margin-bottom:8px">${'★'.repeat(f.rating)}${'☆'.repeat(5 - f.rating)}</div>
-                <p style="color:#333;margin-bottom:8px">${f.comment || 'No comment'}</p>
+                <p style="color:#333;margin-bottom:8px">${escapeHtml(f.comment || 'No comment')}</p>
                 ${f.feedbackPhoto ? `<img src="${f.feedbackPhoto}" style="max-width:100%;max-height:220px;border-radius:8px;border:1px solid #ddd;margin-bottom:8px">` : ''}
                 <p style="font-size:12px;color:#888">${formatDate(f.submittedAt)}</p>
             </div>
@@ -1041,6 +1059,7 @@ function showStandardWorkOrderView(id, wo, history, feedback) {
         </div>`;
 
     showModal('woDetailModal');
+    console.log(`✨ showStandardWorkOrderView COMPLETED - showModal called`);
 }
 
 async function loadPartsDropdown() {
@@ -1942,7 +1961,18 @@ async function loadTechnicianTracking() {
 }
 
 function showModal(id) {
-    document.getElementById(id).classList.add('open');
+    const modalElement = document.getElementById(id);
+    console.log(`🔷 showModal called with id: ${id}`);
+    console.log(`🔷 Modal element found:`, modalElement);
+    
+    if (!modalElement) {
+        console.error(`❌ Modal element with id "${id}" not found in DOM!`);
+        return;
+    }
+    
+    modalElement.classList.add('open');
+    console.log(`🔷 Added 'open' class to modal. Classes now:`, modalElement.className);
+    
     if (id === 'addWorkOrderModal') loadCustomersForWO();
     if (id === 'addUserModal') {
         document.getElementById('addUserModal').querySelector('.modal-header h3').textContent = 'Add Technician';
@@ -2033,7 +2063,7 @@ async function showCustomerFeedbackModal(workOrderId) {
                     ${Array(f.rating).fill('★').join('')}${Array(5-f.rating).fill('☆').join('')}
                     <span style="color:#999;font-size:12px">${f.rating}/5</span>
                 </div>
-                <p style="margin:0 0 8px 0;color:#333;line-height:1.5">${f.comment || 'No comment provided'}</p>
+                <p style="margin:0 0 8px 0;color:#333;line-height:1.5">${escapeHtml(f.comment || 'No comment provided')}</p>
                 ${f.feedbackPhoto ? `<img src="${f.feedbackPhoto}" style="max-width:100%;max-height:250px;border-radius:6px;margin:8px 0">` : ''}
                 <p style="margin:8px 0 0 0;font-size:12px;color:#999">${formatDate(f.submittedAt)}</p>
             </div>
