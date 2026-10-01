@@ -1115,8 +1115,20 @@ async function transitionTechWorkflow(id, status, defaultNote) {
     const res = await apiFetch(`/api/work-orders/${id}/status`, { method: 'POST', body: JSON.stringify({ status, note }) });
     if (res?.ok) { 
         closeModal('woDetailModal'); 
-        loadTechDashboard(); 
-        showToast('✓ Completed Successfully'); 
+        loadTechDashboard();
+        
+        // Show appropriate message based on status
+        let message = '';
+        if (status === 'IN_PROGRESS') {
+            message = '▶ Work started successfully!';
+        } else if (status === 'ON_HOLD') {
+            message = '⏸ Work placed on hold';
+        } else if (status === 'COMPLETED') {
+            message = '✓ Work marked as COMPLETED!';
+        } else {
+            message = `✓ Status changed to ${formatStatus(status)}`;
+        }
+        showToast(message);
     } else { 
         const e = await res?.text(); 
         alert('Status update failed: ' + (e || 'Invalid transition')); 
