@@ -630,7 +630,7 @@ async function loadWorkOrders() {
                 actionButton = `<button class="btn btn-sm btn-success" style="background:#28a745;cursor:default;color:#fff;border:none" disabled>✓ ${w.assignedTo.userName}</button>`;
             } else if (['MANAGER','ADMIN','DISPATCHER'].includes(userRole) && w.status !== 'CLOSED' && w.status !== 'CANCELLED') {
                 // Not assigned and user can assign - show assign button (enable clicking)
-                actionButton = `<button class="btn btn-sm btn-warning" onclick="openAssignModal(${w.id})" style="cursor:pointer;border:none;padding:8px 12px" type="button">👷 Assign</button>`;
+                actionButton = `<button class="btn btn-sm btn-warning" onclick="openAssignModal(${w.id}); return false;" style="cursor:pointer;border:none;padding:8px 12px;pointer-events:auto" type="button">👷 Assign</button>`;
             }
             
             return `
@@ -2140,21 +2140,26 @@ async function openAssignModal(workOrderId) {
         return;
     }
     
-    document.getElementById('assignModalWoId').value = workOrderId;
-    document.getElementById('assignModalError').style.display = 'none';
-    
-    // Load technicians
-    const res = await apiFetch('/api/users/technicians');
-    if (!res || !res.ok) {
-        showError('assignModalError', 'Failed to load technicians');
-        return;
+    try {
+        document.getElementById('assignModalWoId').value = workOrderId;
+        document.getElementById('assignModalError').style.display = 'none';
+        
+        // Load technicians
+        const res = await apiFetch('/api/users/technicians');
+        if (!res || !res.ok) {
+            showError('assignModalError', 'Failed to load technicians');
+            return;
+        }
+        const techs = await res.json();
+        const sel = document.getElementById('assignModalSelect');
+        sel.innerHTML = '<option value="">Select a technician...</option>' + 
+            techs.map(t => `<option value="${t.id}">${t.userName} (${t.userEmail})</option>`).join('');
+        
+        showModal('assignTechModal');
+    } catch (err) {
+        console.error('Error opening assign modal:', err);
+        showError('assignModalError', 'Error: ' + err.message);
     }
-    const techs = await res.json();
-    const sel = document.getElementById('assignModalSelect');
-    sel.innerHTML = '<option value="">Select a technician...</option>' + 
-        techs.map(t => `<option value="${t.id}">${t.userName} (${t.userEmail})</option>`).join('');
-    
-    showModal('assignTechModal');
 }
 
 async function confirmAssign() {
