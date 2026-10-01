@@ -823,6 +823,7 @@ function showTechnicianWorkOrderView(id, wo, history, feedback) {
                             <p style="margin:6px 0 0 0;color:#555;font-size:12px;line-height:1.5">${wo.description || 'No description provided'}</p>
                         </div>
                         ${wo.problemPhoto ? `<div style="margin-top:12px"><img src="${wo.problemPhoto}" style="max-width:100%;height:auto;border-radius:10px;border:2px solid #667eea;box-shadow:0 4px 12px rgba(102, 126, 234, 0.15)"></div>` : ''}
+                        ${wo.completionPhoto ? `<div style="margin-top:12px;background:#f0fdf4;border-radius:10px;padding:12px;border-left:4px solid #10b981"><p style="color:#047857;font-size:11px;font-weight:700;margin:0 0 8px 0">✓ Work Completed By 👷 ${wo.assignedTo?.userName || 'Technician'}</p><img src="${wo.completionPhoto}" style="max-width:100%;height:auto;border-radius:8px;border:2px solid #10b981"></div>` : ''}
                     </div>
                 </div>
             </div>
@@ -922,6 +923,7 @@ function showCustomerWorkOrderView(id, wo, history, feedback) {
                         <p style="margin:0 0 8px 0"><strong>Description:</strong></p>
                         <p style="margin:4px 0 0 0;color:#666;background:#f9f9f9;padding:8px;border-radius:4px;border-left:3px solid #667eea;font-size:11px;line-height:1.4">${wo.description || '—'}</p>
                         ${wo.problemPhoto ? `<div style="margin-top:10px"><img src="${wo.problemPhoto}" style="max-width:100%;height:auto;border-radius:8px;border:2px solid #667eea;max-height:150px;object-fit:cover"></div>` : ''}
+                        ${wo.completionPhoto ? `<div style="margin-top:10px;background:#f0fdf4;border-left:3px solid #10b981;border-radius:4px;padding:8px"><p style="margin:0 0 6px 0;color:#047857;font-size:10px;font-weight:700">✓ Work Completed By 👷 ${wo.assignedTo?.userName || 'Technician'}</p><img src="${wo.completionPhoto}" style="max-width:100%;height:auto;border-radius:6px;border:2px solid #10b981;max-height:150px;object-fit:cover"></div>` : ''}
                     </div>
                 </div>
 
@@ -1013,7 +1015,8 @@ function showStandardWorkOrderView(id, wo, history, feedback) {
             <div class="detail-item"><label>Assigned To</label><span>${wo.assignedTo?.userName || '— Not assigned —'}</span></div>
             <div class="detail-item"><label>Created</label><span>${wo.createdAt ? formatDate(wo.createdAt) : '-'}</span></div>
             <div class="detail-item" style="grid-column:1/-1"><label>Description</label><span>${wo.description || '—'}</span></div>
-            ${wo.problemPhoto ? `<div class="detail-item" style="grid-column:1/-1"><label>Problem Photo</label><br><img src="${wo.problemPhoto}" style="max-width:100%;max-height:300px;border-radius:8px;margin-top:8px;border:1px solid #ddd"></div>` : ''}
+            ${wo.problemPhoto ? `<div class="detail-item" style="grid-column:1/-1"><label>📷 Problem Photo (Reported by Customer)</label><br><img src="${wo.problemPhoto}" style="max-width:100%;max-height:300px;border-radius:8px;margin-top:8px;border:1px solid #ddd"></div>` : ''}
+            ${wo.completionPhoto ? `<div class="detail-item" style="grid-column:1/-1"><label>✓ Work Completed By 👷 ${wo.assignedTo?.userName || 'Technician'}</label><br><img src="${wo.completionPhoto}" style="max-width:100%;max-height:300px;border-radius:8px;margin-top:8px;border:2px solid #4caf50"></div>` : ''}
         </div>
         ${transitions.length ? `<div class="transition-buttons"><strong style="font-size:13px;color:#555;margin-right:8px">Change Status:</strong>${transitions.map(t => `<button class="btn btn-sm ${t.cls}" onclick="transition(${id},'${t.status}')">${t.label}</button>`).join('')}</div>` : ''}
         ${feedback && feedback.length > 0 ? `
@@ -1056,7 +1059,58 @@ async function transition(id, status) {
     else { const e = await res?.text(); alert('Not allowed: ' + (e || 'Invalid transition')); }
 }
 
+async function submitCompletionPhoto() {
+    const woId = document.getElementById('completionPhotoWoId').value;
+    const note = document.getElementById('completionPhotoNote').value || '';
+    const photoInput = document.getElementById('completionPhotoInput');
+    
+    if (!photoInput || !photoInput.files || !photoInput.files[0]) {
+        showError('completionPhotoError', '📸 Please select a photo');
+        return;
+    }
+    
+    // Convert photo to base64
+    const file = photoInput.files[0];
+    const reader = new FileReader();
+    
+    reader.onload = async function(e) {
+        const completionPhoto = e.target.result;
+        
+        const res = await apiFetch(`/api/work-orders/${woId}/status`, {
+            method: 'POST',
+            body: JSON.stringify({
+                status: 'COMPLETED',
+                note: note,
+                completionPhoto: completionPhoto
+            })
+        });
+        
+        if (res?.ok) {
+            closeModal('completionPhotoModal');
+            closeModal('woDetailModal');
+            loadTechDashboard();
+            showToast('✓ Work marked as COMPLETED with photo!');
+        } else {
+            const e = await res?.text();
+            showError('completionPhotoError', 'Failed: ' + (e || 'Unknown error'));
+        }
+    };
+    
+    reader.readAsDataURL(file);
+}
+
 async function transitionTechWorkflow(id, status, defaultNote) {
+    // If transitioning to COMPLETED, show photo upload modal
+    if (status === 'COMPLETED') {
+        document.getElementById('completionPhotoWoId').value = id;
+        document.getElementById('completionPhotoNote').value = defaultNote || '';
+        document.getElementById('completionPhotoError').style.display = 'none';
+        document.getElementById('completionPhotoPreview').style.display = 'none';
+        document.getElementById('completionPhotoInput').value = '';
+        showModal('completionPhotoModal');
+        return;
+    }
+    
     const note = prompt(`Note for ${formatStatus(status)} (optional):`, defaultNote) || defaultNote || '';
     const res = await apiFetch(`/api/work-orders/${id}/status`, { method: 'POST', body: JSON.stringify({ status, note }) });
     if (res?.ok) { 

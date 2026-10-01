@@ -152,13 +152,19 @@ public class WorkOrderService {
 
     @Transactional
     public WorkOrder transition(Long workOrderId, WorkOrderStatus toStatus,
-            String changedBy, String note) {
+            String changedBy, String note, String completionPhoto) {
         WorkOrder wo = workOrderRepo.findById(workOrderId)
                 .orElseThrow(() -> new RuntimeException("Work order not found"));
         validateTransition(wo.getStatus(), toStatus);
         WorkOrderStatus prev = wo.getStatus();
         wo.setStatus(toStatus);
         wo.setUpdatedAt(LocalDateTime.now());
+        
+        // If transitioning to COMPLETED and photo provided, store it
+        if (toStatus == WorkOrderStatus.COMPLETED && completionPhoto != null && !completionPhoto.isEmpty()) {
+            wo.setCompletionPhoto(completionPhoto);
+        }
+        
         WorkOrder saved = workOrderRepo.save(wo);
         historyRepo.save(new WorkOrderStatusHistory(saved, prev, toStatus, changedBy, note));
 

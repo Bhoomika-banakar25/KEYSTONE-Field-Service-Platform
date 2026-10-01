@@ -88,7 +88,8 @@ public class WorkOrderController {
             @RequestBody Map<String, Object> body, Principal principal) {
         WorkOrderStatus toStatus = WorkOrderStatus.valueOf(body.get("status").toString());
         String note = body.getOrDefault("note", "").toString();
-        return ResponseEntity.ok(workOrderService.transition(id, toStatus, principal.getName(), note));
+        String completionPhoto = body.getOrDefault("completionPhoto", "").toString();
+        return ResponseEntity.ok(workOrderService.transition(id, toStatus, principal.getName(), note, completionPhoto));
     }
 
     @PostMapping("/{id}/parts")

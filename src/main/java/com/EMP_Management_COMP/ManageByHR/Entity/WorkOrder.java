@@ -38,6 +38,9 @@ public class WorkOrder {
     @Column(columnDefinition = "LONGTEXT")
     private String problemPhoto;
 
+    @Column(columnDefinition = "LONGTEXT")
+    private String completionPhoto;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Priority priority;
@@ -85,6 +88,9 @@ public class WorkOrder {
 
     public String getProblemPhoto() { return problemPhoto; }
     public void setProblemPhoto(String problemPhoto) { this.problemPhoto = problemPhoto; }
+
+    public String getCompletionPhoto() { return completionPhoto; }
+    public void setCompletionPhoto(String completionPhoto) { this.completionPhoto = completionPhoto; }
 
     public Priority getPriority() { return priority; }
     public void setPriority(Priority priority) { this.priority = priority; }
